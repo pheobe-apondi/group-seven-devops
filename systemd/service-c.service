@@ -1,0 +1,16 @@
+[Unit]
+Description=Service C
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/devops-lab/group-seven-devops
+ExecStart=/usr/bin/python3 /home/ubuntu/devops-lab/group-seven-devops/services/service_c.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
