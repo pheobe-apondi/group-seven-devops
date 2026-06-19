@@ -5,6 +5,36 @@
 
 This project demonstrates a production-ready microservices environment with three internal HTTP services orchestrated through systemd, exposed via Nginx reverse proxy, with structured JSON logging and distributed request tracing.
 
+## Quick Start
+
+### Clone and Deploy (5 minutes)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/pheobe-apondi/group-seven-devops.git
+cd group-seven-devops
+
+# 2. Run the automated installer
+sudo ./install.sh
+
+# 3. Verify it's working
+curl http://localhost/service-a/greet-service-b
+
+# 4. View logs
+journalctl -u "service-*" -f
+```
+
+The installer will:
+- Install system dependencies (Python, Nginx, etc.)
+- Configure service discovery
+- Set up systemd services
+- Configure Nginx reverse proxy
+- Start all services
+
+### Manual Deployment (if you prefer)
+
+See [Installation](#installation) section below.
+
 ## Architecture
 
 ```
@@ -536,4 +566,3 @@ sudo systemctl restart service-a service-b service-c
 bash health-check.sh
 ```
 ```
-
