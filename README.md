@@ -1,5 +1,4 @@
 
-```markdown
 # Production-Style Service Architecture
 
 ## Overview
