@@ -1,3 +1,5 @@
+
+```markdown
 # Production-Style Service Architecture
 
 ## Overview
@@ -42,11 +44,9 @@ Services communicate using DNS names in `/etc/hosts`:
 127.0.0.1 service-c.internal
 ```
 
-**How to troubleshoot discovery:**
-```bash
-nslookup service-a.internal
-cat /etc/hosts | grep service
-```
+**How it works:** Services use hostnames instead of hardcoded IPs. The kernel resolves names via `/etc/hosts`. This decouples application logic from infrastructure.
+
+**Troubleshooting:** `nslookup service-b.internal` or `cat /etc/hosts | grep service`
 
 ### Request Tracing
 
@@ -69,7 +69,14 @@ journalctl -u service-c | grep <request-id>
 - Nginx
 - systemd
 
-### Setup
+### Automated Setup
+
+```bash
+cd /home/ubuntu/devops-lab/group-seven-devops
+./install.sh
+```
+
+### Manual Setup
 
 ```bash
 # 1. Install dependencies
@@ -95,7 +102,7 @@ sudo cp nginx/default.conf /etc/nginx/sites-available/default
 sudo nginx -t
 sudo systemctl restart nginx
 
-# 5. Enable and start services
+# 5. Enable and start services (order matters!)
 sudo systemctl enable service-a service-b service-c
 sudo systemctl start service-b service-c service-a
 ```
@@ -129,11 +136,14 @@ systemctl status service-a service-b service-c
 ### View Logs
 
 ```bash
-# Service A logs
+# Service A logs (live)
 journalctl -u service-a -f
 
-# All services
+# All services (live)
 journalctl -u "service-*" -f
+
+# Last 50 lines
+journalctl -u service-a -n 50
 ```
 
 ## Validation
@@ -158,7 +168,7 @@ curl http://localhost/service-a/greet-service-b
 Expected response:
 ```json
 {
-  "request_id": "...",
+  "request_id": "ae9eab31-a249-4803-bae4-a136cd98c2a8",
   "status": "success",
   "message": "Request completed successfully"
 }
@@ -176,15 +186,29 @@ journalctl -u service-b | grep $REQUEST_ID
 journalctl -u service-c | grep $REQUEST_ID
 ```
 
+All three should show the same request_id in their logs.
+
 ## Logging
 
 All services produce structured JSON logs with:
 - `timestamp`: ISO 8601 UTC
 - `service`: service name
-- `event`: event type
+- `event`: event type (request_received, downstream_call, callback_sent, etc.)
 - `request_id`: distributed trace ID
 - `status`: HTTP status code
 - Additional context fields per event type
+
+**Example log entry:**
+```json
+{
+  "timestamp": "2026-06-19T17:06:06.969532Z",
+  "service": "service-a",
+  "event": "callback_received",
+  "request_id": "ae9eab31-a249-4803-bae4-a136cd98c2a8",
+  "source_service": "service-c",
+  "status": 200
+}
+```
 
 **Log locations:**
 ```bash
@@ -195,112 +219,292 @@ journalctl -u service-c
 
 ## Troubleshooting
 
-### Service fails to start
+### Scenario 1: Service B is Unavailable
+
+**What happens:** Service A will fail to forward requests. Requests to `/greet-service-b` will timeout or return 500.
+
+**Investigation steps:**
 
 ```bash
-# Check systemd status
-systemctl status service-a
-
-# Check logs
-journalctl -u service-a -n 50
-
-# Verify port is available
-netstat -tlnp | grep 3001
-```
-
-### Service discovery fails
-
-```bash
-# Verify /etc/hosts entries
-cat /etc/hosts | grep service
-
-# Test DNS resolution
-nslookup service-b.internal
-
-# Manual test
-curl http://service-a.internal:3001/health
-```
-
-### Reverse proxy fails
-
-```bash
-# Test Nginx config
-sudo nginx -t
-
-# Check Nginx logs
-sudo tail -f /var/log/nginx/access.log
-
-# Verify upstream is reachable
-curl http://127.0.0.1:3001/health
-```
-
-### Services can't communicate
-
-```bash
-# Check if target service is running
+# 1. Check if Service B is running
 systemctl status service-b
 
-# Verify request reaches target
-journalctl -u service-b -f
+# 2. If it's not running, check why it crashed
+journalctl -u service-b -n 50
 
-# Test direct connection
-curl http://service-b.internal:3002/health
+# 3. Check for errors
+journalctl -u service-b --no-pager | tail -30
+
+# 4. Restart Service B
+sudo systemctl restart service-b
+
+# 5. Verify it's running
+systemctl status service-b
+
+# 6. Test the flow again
+curl http://localhost/service-a/greet-service-b
 ```
 
-### Missing logs
+**Expected logs if B is down:**
+Service A logs will show:
+```json
+{
+  "event": "downstream_call_failed",
+  "target": "service-b",
+  "error": "Connection refused",
+  "status": 500
+}
+```
+
+---
+
+### Scenario 2: 502 Error from Nginx
+
+**Symptoms:** `curl http://localhost/service-a/health` returns 502 or connection error
+
+**Investigation steps:**
 
 ```bash
-# Check if service is running
+# 1. Check if Service A is running
 systemctl status service-a
 
-# Check systemd journal
-journalctl -u service-a -n 100
+# 2. Check Service A logs for startup errors
+journalctl -u service-a -n 20
 
-# Restart and monitor
-sudo systemctl restart service-a
-journalctl -u service-a -f
+# 3. Verify Service A is listening on the right port
+netstat -tlnp | grep 3001
+
+# 4. Test Service A directly (bypassing Nginx)
+curl http://127.0.0.1:3001/health
+
+# 5. Check Nginx logs
+sudo tail -f /var/log/nginx/error.log
+
+# 6. Verify Nginx config is valid
+sudo nginx -t
+
+# 7. Restart Nginx if config is valid
+sudo systemctl restart nginx
+
+# 8. Test again
+curl http://localhost/service-a/health
 ```
 
-### Network isolation issues
+**Common causes and fixes:**
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `curl http://127.0.0.1:3001/health` works but `curl http://localhost/service-a/health` fails | Nginx not running or misconfigured | `sudo systemctl restart nginx && sudo nginx -t` |
+| `systemctl status service-a` shows failed | Service crashed on startup | `journalctl -u service-a -n 30` to see error |
+| Port 3001 already in use | Another process using the port | `sudo lsof -i :3001` to find it |
+| Python/Flask not installed | Missing dependencies | `pip3 install --break-system-packages flask requests` |
+
+---
+
+### Scenario 3: Service Discovery Failure
+
+**Symptoms:** Service A logs show `Failed to resolve 'service-b.internal'`
+
+**Investigation steps:**
 
 ```bash
-# Services should NOT be accessible from outside
-curl http://<vm-ip>:3002  # Should fail
+# 1. Check /etc/hosts entries
+cat /etc/hosts | grep service
 
-# But localhost access should work
-curl http://127.0.0.1:3002/health  # Should work
+# 2. Test DNS resolution manually
+nslookup service-b.internal
 
-# Verify listen address
-netstat -tlnp | grep 3002
-# Should show 127.0.0.1:3002, NOT 0.0.0.0:3002
+# 3. Try ping (another test)
+ping -c 1 service-b.internal
+
+# 4. Check what should be there
+cat /etc/hosts
+# Should show:
+# 127.0.0.1 service-a.internal
+# 127.0.0.1 service-b.internal
+# 127.0.0.1 service-c.internal
+
+# 5. If missing, add them
+sudo bash -c 'cat >> /etc/hosts << EOF
+127.0.0.1 service-a.internal
+127.0.0.1 service-b.internal
+127.0.0.1 service-c.internal
+EOF'
+
+# 6. Verify they were added
+cat /etc/hosts | tail -3
+
+# 7. Test resolution again
+nslookup service-b.internal
+
+# 8. Restart services to pick up changes
+sudo systemctl restart service-a service-b service-c
 ```
 
-### Request doesn't flow through all services
-
+**Verify the fix:**
 ```bash
-# Check service dependency order in systemd
-systemctl cat service-a | grep After
-
-# Start services in correct order
-sudo systemctl stop service-a service-b service-c
-sudo systemctl start service-b service-c service-a
-
-# Trigger request and trace
 curl http://localhost/service-a/greet-service-b
-journalctl -u "service-*" -n 50
+journalctl -u service-a | tail -20
+```
+
+---
+
+### Scenario 4: Failed Service A Startup
+
+**Symptoms:** `systemctl status service-a` shows `failed (Result: exit-code)`
+
+**Investigation steps:**
+
+```bash
+# 1. Check service status
+systemctl status service-a
+
+# 2. Get detailed startup logs
+journalctl -u service-a -n 50 --no-pager
+
+# 3. Check if dependencies are available
+systemctl status service-b
+systemctl status service-c
+
+# 4. Check if port 3001 is in use
+netstat -tlnp | grep 3001
+# If something else uses it: sudo lsof -i :3001
+
+# 5. Verify working directory exists
+ls -la /home/ubuntu/devops-lab/group-seven-devops/
+
+# 6. Verify Python and Flask are installed
+python3 --version
+pip3 list | grep flask
+
+# 7. Try running the service manually to see the real error
+python3 /home/ubuntu/devops-lab/group-seven-devops/services/service_a.py
+
+# 8. If manual run works but systemd fails, check service file
+systemctl cat service-a
+```
+
+**Common causes and fixes:**
+
+| Cause | Fix |
+|-------|-----|
+| Dependencies (B, C) not started | `sudo systemctl start service-b service-c` |
+| Python not installed | `sudo apt install python3 python3-pip` |
+| Flask/requests not installed | `pip3 install --break-system-packages flask requests` |
+| Port 3001 already in use | `sudo lsof -i :3001` and kill the process |
+| Service file syntax error | `systemctl cat service-a` and fix any issues |
+| Permission denied | Ensure file ownership is correct |
+
+---
+
+### Request Tracing Example
+
+To troubleshoot a specific request that failed:
+
+```bash
+# 1. Trigger a request and capture the ID
+RESPONSE=$(curl -s http://localhost/service-a/greet-service-b)
+REQUEST_ID=$(echo $RESPONSE | jq -r .request_id)
+echo "Request ID: $REQUEST_ID"
+
+# 2. Search all service logs for this ID
+echo ""
+echo "=== Service A logs ==="
+journalctl -u service-a | grep $REQUEST_ID
+
+echo ""
+echo "=== Service B logs ==="
+journalctl -u service-b | grep $REQUEST_ID
+
+echo ""
+echo "=== Service C logs ==="
+journalctl -u service-c | grep $REQUEST_ID
+
+# 3. Analyze the flow
+# Expected order:
+# - A: request_received
+# - B: request_received
+# - C: request_received
+# - C: callback_sent
+# - A: callback_received
+# - A: downstream_call_success
+
+# If any service is missing logs for this ID, the request didn't reach it
+```
+
+---
+
+### Health Check Procedure
+
+Run this to verify everything is working:
+
+```bash
+#!/bin/bash
+echo "=== System Health Check ==="
+
+echo "Checking services..."
+systemctl status service-a service-b service-c | grep -E "Active|Loaded"
+
+echo ""
+echo "Testing service health endpoints..."
+echo -n "Service A: "
+curl -s http://127.0.0.1:3001/health | jq .status
+
+echo -n "Service B: "
+curl -s http://127.0.0.1:3002/health | jq .status
+
+echo -n "Service C: "
+curl -s http://127.0.0.1:3003/health | jq .status
+
+echo ""
+echo "Testing full request flow..."
+RESPONSE=$(curl -s http://localhost/service-a/greet-service-b)
+REQUEST_ID=$(echo $RESPONSE | jq -r .request_id)
+STATUS=$(echo $RESPONSE | jq -r .status)
+
+echo "Request ID: $REQUEST_ID"
+echo "Status: $STATUS"
+
+if [ "$STATUS" == "success" ]; then
+    echo "✓ Full flow works"
+else
+    echo "✗ Full flow failed"
+    exit 1
+fi
+
+echo ""
+echo "Checking service discovery..."
+for SERVICE in service-a.internal service-b.internal service-c.internal; do
+    if nslookup $SERVICE > /dev/null 2>&1; then
+        echo "✓ $SERVICE resolves"
+    else
+        echo "✗ $SERVICE does not resolve"
+    fi
+done
+
+echo ""
+echo "Checking network isolation..."
+echo -n "Service B internal access: "
+curl -s http://127.0.0.1:3002/health > /dev/null && echo "✓ Works"
+
+echo -n "Service C internal access: "
+curl -s http://127.0.0.1:3003/health > /dev/null && echo "✓ Works"
+
+echo ""
+echo "=== Health check complete ==="
 ```
 
 ## Verification Checklist
 
-- [ ] All three services start on boot
-- [ ] Services restart on failure
-- [ ] Service A depends on B and C
-- [ ] Nginx exposes only Service A
-- [ ] Services B and C are not externally accessible
-- [ ] Full request flow works: A → B → C → A
-- [ ] Request ID propagates through all logs
-- [ ] All logs are valid JSON
-- [ ] Service discovery works (`service-b.internal` resolves)
+- [ ] All three services start on boot: `sudo reboot && systemctl status service-*`
+- [ ] Services restart on failure: `sudo systemctl stop service-b && sleep 5 && systemctl status service-b`
+- [ ] Service A depends on B and C: `systemctl cat service-a | grep After`
+- [ ] Nginx exposes only Service A: `curl http://localhost/service-a/health` works
+- [ ] Services B and C not externally accessible: `curl http://<vm-ip>:3002` fails
+- [ ] Full request flow works: `curl http://localhost/service-a/greet-service-b` returns success
+- [ ] Request ID in all logs: Trace a request through all three services
+- [ ] All logs are valid JSON: `journalctl -u service-a | head -5 | jq .`
+- [ ] Service discovery works: `nslookup service-b.internal` resolves
 
 ## Deployment Notes
 
@@ -309,4 +513,28 @@ journalctl -u "service-*" -n 50
 - Logs accessible via `journalctl` (systemd journal)
 - Configuration is code: all settings in `.service` files and `nginx/default.conf`
 - No databases or external dependencies required
+- Services start in order: B → C → A (A depends on B and C)
+
+## Quick Commands
+
+```bash
+# Deploy
+./install.sh
+
+# Check status
+systemctl status service-a service-b service-c
+
+# View logs
+journalctl -u "service-*" -f
+
+# Test flow
+curl http://localhost/service-a/greet-service-b
+
+# Restart all
+sudo systemctl restart service-a service-b service-c
+
+# Run health check
+bash health-check.sh
 ```
+```
+
