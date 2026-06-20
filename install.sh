@@ -3,14 +3,26 @@ set -Eeuo pipefail
 
 echo "[*] Installing production service environment..."
 
+# 0. Stop any existing services first
+echo "[*] Cleaning up any existing services..."
+sudo systemctl stop service-a service-b service-c nginx 2>/dev/null || true
+sleep 2
+
 # 1. Install system dependencies
 echo "[*] Installing system packages..."
 sudo apt update
+
+# Remove any conflicting Debian-managed Python packages
+echo "[*] Cleaning up conflicting packages..."
+sudo apt remove -y python3-blinker python3-flask python3-requests 2>/dev/null || true
+
 sudo apt install -y python3 python3-pip nginx
 
-# 2. Install Python dependencies
+# 2. Install Python dependencies (fresh from pip, not Debian)
 echo "[*] Installing Python packages..."
-pip3 install --break-system-packages flask requests
+pip3 install --break-system-packages --upgrade flask requests
+
+echo "[+] Python dependencies installed"
 
 # 3. Setup service discovery
 echo "[*] Configuring service discovery (/etc/hosts)..."
@@ -21,6 +33,8 @@ if ! grep -q "service-a.internal" /etc/hosts; then
 127.0.0.1 service-c.internal
 EOFHOSTS'
     echo "[+] Service discovery entries added"
+else
+    echo "[+] Service discovery entries already exist"
 fi
 
 # 4. Install systemd services
@@ -29,30 +43,37 @@ sudo cp systemd/service-a.service /etc/systemd/system/
 sudo cp systemd/service-b.service /etc/systemd/system/
 sudo cp systemd/service-c.service /etc/systemd/system/
 sudo systemctl daemon-reload
+echo "[+] Systemd services installed"
 
 # 5. Configure Nginx
 echo "[*] Configuring Nginx..."
 sudo cp nginx/default.conf /etc/nginx/sites-available/default
 sudo nginx -t > /dev/null && echo "[+] Nginx config valid"
 sudo systemctl restart nginx
+echo "[+] Nginx configured and running"
 
 # 6. Enable services
 echo "[*] Enabling services..."
 sudo systemctl enable service-a service-b service-c
+echo "[+] Services enabled"
 
-# 7. Start services
+# 7. Start services (order matters!)
 echo "[*] Starting services..."
 sudo systemctl start service-b service-c service-a
+echo "[+] Services started"
 
 # 8. Wait for startup
 sleep 3
 
 # 9. Verify
 echo "[*] Verifying installation..."
+
 if curl -s http://127.0.0.1:3001/health > /dev/null; then
     echo "[+] Service A: OK"
 else
     echo "[-] Service A: FAILED"
+    echo "    Logs:"
+    journalctl -u service-a -n 10
     exit 1
 fi
 
@@ -60,6 +81,8 @@ if curl -s http://127.0.0.1:3002/health > /dev/null; then
     echo "[+] Service B: OK"
 else
     echo "[-] Service B: FAILED"
+    echo "    Logs:"
+    journalctl -u service-b -n 10
     exit 1
 fi
 
@@ -67,6 +90,8 @@ if curl -s http://127.0.0.1:3003/health > /dev/null; then
     echo "[+] Service C: OK"
 else
     echo "[-] Service C: FAILED"
+    echo "    Logs:"
+    journalctl -u service-c -n 10
     exit 1
 fi
 
