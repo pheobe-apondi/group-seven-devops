@@ -1,4 +1,3 @@
-
 # Production-Style Service Architecture
 
 ## Overview
@@ -26,10 +25,35 @@ journalctl -u "service-*" -f
 
 The installer will:
 - Install system dependencies (Python, Nginx, etc.)
+- Remove conflicting packages (if any)
 - Configure service discovery
 - Set up systemd services
 - Configure Nginx reverse proxy
 - Start all services
+
+### Troubleshooting Installation
+
+**If installation fails or you want a clean slate:**
+
+```bash
+# Complete reset (stops all services and removes configs)
+./reset.sh
+
+# Then reinstall fresh
+sudo ./install.sh
+```
+
+The `reset.sh` script:
+- Stops all services
+- Removes systemd service files
+- Clears Nginx configuration
+- Leaves the codebase intact
+
+**Use this if:**
+- Installation fails midway
+- You're running install.sh multiple times
+- Services are in a bad state
+- You want to start completely fresh
 
 ### Manual Deployment (if you prefer)
 
@@ -550,6 +574,9 @@ echo "=== Health check complete ==="
 # Deploy
 ./install.sh
 
+# Reset and redeploy
+./reset.sh && sudo ./install.sh
+
 # Check status
 systemctl status service-a service-b service-c
 
@@ -566,3 +593,5 @@ sudo systemctl restart service-a service-b service-c
 bash health-check.sh
 ```
 ```
+
+
