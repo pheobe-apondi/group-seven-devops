@@ -6,7 +6,6 @@ After=service-b.service service-c.service
 
 [Service]
 Type=simple
-User=ubuntu
 WorkingDirectory=/home/ubuntu/devops-lab/group-seven-devops
 ExecStart=/usr/bin/python3 /home/ubuntu/devops-lab/group-seven-devops/services/service_a.py
 Restart=on-failure
