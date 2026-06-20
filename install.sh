@@ -3,6 +3,10 @@ set -Eeuo pipefail
 
 echo "[*] Installing production service environment..."
 
+# Auto-detect the project directory (where install.sh is running from)
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "[*] Project directory: $PROJECT_DIR"
+
 # 0. Stop any existing services first
 echo "[*] Cleaning up any existing services..."
 sudo systemctl stop service-a service-b service-c nginx 2>/dev/null || true
@@ -37,11 +41,68 @@ else
     echo "[+] Service discovery entries already exist"
 fi
 
-# 4. Install systemd services
+# 4. Install systemd services (with auto-detected path)
 echo "[*] Installing systemd service files..."
-sudo cp systemd/service-a.service /etc/systemd/system/
-sudo cp systemd/service-b.service /etc/systemd/system/
-sudo cp systemd/service-c.service /etc/systemd/system/
+
+# Create service-a.service with correct PROJECT_DIR
+sudo bash -c "cat > /etc/systemd/system/service-a.service << 'EOF'
+[Unit]
+Description=Service A
+After=network.target
+Wants=service-b.service service-c.service
+After=service-b.service service-c.service
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_DIR
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_a.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF"
+
+# Create service-b.service with correct PROJECT_DIR
+sudo bash -c "cat > /etc/systemd/system/service-b.service << 'EOF'
+[Unit]
+Description=Service B
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_DIR
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_b.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF"
+
+# Create service-c.service with correct PROJECT_DIR
+sudo bash -c "cat > /etc/systemd/system/service-c.service << 'EOF'
+[Unit]
+Description=Service C
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_DIR
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_c.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF"
+
 sudo systemctl daemon-reload
 echo "[+] Systemd services installed"
 
