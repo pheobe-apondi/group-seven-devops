@@ -661,8 +661,37 @@ The same production flow runs in Docker Compose without any VM or systemd setup 
 
 ### Prerequisites
 
-- Docker
+- Docker Engine
 - Docker Compose v2 (`docker compose` not `docker-compose`)
+
+**Install Docker on Ubuntu:**
+```bash
+sudo apt install docker-compose-v2 docker.io
+```
+
+> If `docker.io` installs `podman-docker` instead of real Docker, see [Troubleshooting Docker Compose](#troubleshooting-docker-compose) below.
+
+After install, add your user to the docker group so you don't need sudo:
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+Verify Docker is running:
+```bash
+sudo systemctl start docker
+docker --version
+```
+
+**Install Docker on macOS:**
+```bash
+brew install --cask docker
+open /Applications/Docker.app
+```
+
+**Install Docker on Windows:**
+
+Download and install Docker Desktop from https://www.docker.com/products/docker-desktop
 
 ### Start the system
 
