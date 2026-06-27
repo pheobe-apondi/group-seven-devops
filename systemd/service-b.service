@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ubuntu/devops-lab/group-seven-devops
-ExecStart=/usr/bin/python3 /home/ubuntu/devops-lab/group-seven-devops/services/service_b.py
+WorkingDirectory=/home/administrator/group-seven-devops
+ExecStart=/usr/bin/python3 /home/administrator/group-seven-devops/services/service_b.py
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal

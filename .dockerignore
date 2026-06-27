@@ -1,0 +1,15 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+.venv/
+*.log
+systemd/
+docs/
+*.md
+health-check.sh
+install.sh
+reset.sh

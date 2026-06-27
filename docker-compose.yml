@@ -1,0 +1,49 @@
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/docker.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - service-a
+    restart: unless-stopped
+    networks:
+      - internal
+
+  service-a:
+    build:
+      context: .
+      args:
+        SERVICE_FILE: service_a.py
+    environment:
+      - SERVICE_FILE=service_a.py
+    restart: unless-stopped
+    networks:
+      - internal
+
+  service-b:
+    build:
+      context: .
+      args:
+        SERVICE_FILE: service_b.py
+    environment:
+      - SERVICE_FILE=service_b.py
+    restart: unless-stopped
+    networks:
+      - internal
+
+  service-c:
+    build:
+      context: .
+      args:
+        SERVICE_FILE: service_c.py
+    environment:
+      - SERVICE_FILE=service_c.py
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
