@@ -71,6 +71,9 @@ This project demonstrates a production-ready microservices system with:
 
 ---
 
+<details>
+<summary><strong>Before You Start — Choose Your OS Setup Guide</strong> (click to expand)</summary>
+
 ## Before You Start — Choose Your OS Setup Guide
 
 **⚠️ Important:** This project runs on **Ubuntu 24.04 LTS** inside a dedicated VM. Do not run it on a shared or existing VM — `install.sh` writes to `/etc/hosts`, installs systemd units, and modifies Nginx config.
@@ -88,6 +91,11 @@ The original development environment was a fresh Ubuntu 24.04 LTS instance with 
 These guides walk through creating a fresh Ubuntu 24.04 LTS VM (or WSL) with the correct baseline.
 
 ---
+
+</details>
+
+<details>
+<summary><strong>Quick Start (5 minutes)</strong> (click to expand)</summary>
 
 ## Quick Start (5 minutes)
 
@@ -138,6 +146,11 @@ sudo ./install.sh
 
 ---
 
+</details>
+
+<details>
+<summary><strong>Environment Requirements</strong> (click to expand)</summary>
+
 ## Environment Requirements
 
 ### Host OS
@@ -163,6 +176,11 @@ sudo ./install.sh
 See [requirements.txt](requirements.txt) for pinned versions.
 
 ---
+
+</details>
+
+<details>
+<summary><strong>System Architecture</strong> (click to expand)</summary>
 
 ## System Architecture
 
@@ -263,6 +281,11 @@ Service A       Service B      Service C
 
 ---
 
+</details>
+
+<details>
+<summary><strong>Data Flow</strong> (click to expand)</summary>
+
 ## Data Flow
 
 ### Example: Request Lifecycle
@@ -335,6 +358,11 @@ Allows complete tracing via:
 
 ---
 
+</details>
+
+<details>
+<summary><strong>Network Security</strong> (click to expand)</summary>
+
 ## Network Security
 
 ### Security Layers
@@ -390,6 +418,11 @@ curl http://<vm-ip>/service-a/health  # Works (via Nginx)
 
 ---
 
+</details>
+
+<details>
+<summary><strong>Service Discovery</strong> (click to expand)</summary>
+
 ## Service Discovery
 
 ### How Services Find Each Other
@@ -436,6 +469,11 @@ sudo systemctl restart service-a service-b service-c  # Restart may be needed
 ```
 
 ---
+
+</details>
+
+<details>
+<summary><strong>Request Tracing</strong> (click to expand)</summary>
 
 ## Request Tracing
 
@@ -503,6 +541,11 @@ journalctl -u service-c -e | grep "$REQUEST_ID"
 ```
 
 ---
+
+</details>
+
+<details>
+<summary><strong>Host Deployment (Systemd)</strong> (click to expand)</summary>
 
 ## Host Deployment (Systemd)
 
@@ -572,6 +615,8 @@ curl http://localhost/service-a/health
 ```
 
 ---
+
+</details>
 
 ## Container Deployment (Docker)
 
@@ -769,6 +814,9 @@ docker compose -f docker-compose.prod.yml down -v
 
 ---
 
+<details>
+<summary><strong>Service Management</strong> (click to expand)</summary>
+
 ## Service Management
 
 ### Start Services
@@ -837,6 +885,11 @@ systemctl status service-b
 
 ---
 
+</details>
+
+<details>
+<summary><strong>Viewing Logs</strong> (click to expand)</summary>
+
 ## Viewing Logs
 
 ### Service Logs (Systemd Journal)
@@ -881,6 +934,11 @@ sudo logrotate -d /etc/logrotate.d/nginx-json
 ```
 
 ---
+
+</details>
+
+<details>
+<summary><strong>Health Checks</strong> (click to expand)</summary>
 
 ## Health Checks
 
@@ -931,6 +989,11 @@ done
 
 ---
 
+</details>
+
+<details>
+<summary><strong>Verification Steps</strong> (click to expand)</summary>
+
 ## Verification Steps
 
 ### Complete System Verification
@@ -973,6 +1036,11 @@ journalctl -u service-a -e | grep "$REQUEST_ID"
 ```
 
 ---
+
+</details>
+
+<details>
+<summary><strong>API Endpoints</strong> (click to expand)</summary>
 
 ## API Endpoints
 
@@ -1026,6 +1094,11 @@ curl -H "X-Request-ID: abc-123" http://service-c.internal:3003/greet-c
 
 ---
 
+</details>
+
+<details>
+<summary><strong>Request Flow Example</strong> (click to expand)</summary>
+
 ## Request Flow Example
 
 ### Step-by-Step Walkthrough
@@ -1067,6 +1140,11 @@ journalctl -u service-a -e | grep "$REQUEST_ID" | tail -1
 ```
 
 ---
+
+</details>
+
+<details>
+<summary><strong>Structured Logging Format</strong> (click to expand)</summary>
 
 ## Structured Logging Format
 
@@ -1132,6 +1210,11 @@ All structured logs include:
 ```
 
 ---
+
+</details>
+
+<details>
+<summary><strong>Common Issues</strong> (click to expand)</summary>
 
 ## Common Issues
 
@@ -1240,6 +1323,11 @@ cat /var/log/nginx/access.json | jq .
 ```
 
 ---
+
+</details>
+
+<details>
+<summary><strong>Troubleshooting Guide</strong> (click to expand)</summary>
 
 ## Troubleshooting Guide
 
@@ -1387,6 +1475,11 @@ newgrp docker
 
 ---
 
+</details>
+
+<details>
+<summary><strong>Service Recovery</strong> (click to expand)</summary>
+
 ## Service Recovery
 
 ### Automatic Recovery
@@ -1431,6 +1524,8 @@ journalctl -u service-a -n 10
 ```
 
 ---
+
+</details>
 
 ## GitHub Actions Pipeline
 
@@ -1897,6 +1992,9 @@ group-seven-devops/
 
 ---
 
+<details>
+<summary><strong>Contributing</strong> (click to expand)</summary>
+
 ## Contributing
 
 When working on this project:
@@ -1935,17 +2033,27 @@ When working on this project:
 
 ---
 
+</details>
+
 ## License
 
 This project is for educational purposes as part of the DevOps program.
 
 ---
 
+<details>
+<summary><strong>Questions?</strong> (click to expand)</summary>
+
 ## Questions?
 
 For troubleshooting, see the [Troubleshooting Guide](#troubleshooting-guide) section above.
 For architecture questions, refer to [System Architecture](#system-architecture).
 For deployment questions, see [Host Deployment](#host-deployment-systemd) or [Container Deployment](#container-deployment-docker).
+
+</details>
+
+<details>
+<summary><strong>Verification Checklist</strong> (click to expand)</summary>
 
 ## Verification Checklist
 
@@ -1959,6 +2067,11 @@ For deployment questions, see [Host Deployment](#host-deployment-systemd) or [Co
 - [ ] All logs are valid JSON: `journalctl -u service-a | head -5 | jq .`
 - [ ] Service discovery works: `nslookup service-b.internal` resolves
 
+</details>
+
+<details>
+<summary><strong>Deployment Notes</strong> (click to expand)</summary>
+
 ## Deployment Notes
 
 - Designed for **Ubuntu 24.04 LTS** on a dedicated VM
@@ -1967,6 +2080,11 @@ For deployment questions, see [Host Deployment](#host-deployment-systemd) or [Co
 - Configuration is code: all settings in `.service` files and `nginx/default.conf`
 - No databases or external dependencies required
 - Services start in order: B → C → A (A requires B and C)
+
+</details>
+
+<details>
+<summary><strong>Quick Commands</strong> (click to expand)</summary>
 
 ## Quick Commands
 
@@ -1992,4 +2110,6 @@ sudo systemctl restart service-a service-b service-c
 # Run health check
 bash health-check.sh
 ```
+
+</details>
 
