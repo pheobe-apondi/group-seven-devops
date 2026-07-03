@@ -1,0 +1,48 @@
+services:
+  service-a:
+    image: ${DOCKERHUB_USERNAME}/${APP_NAME}-service-a:${IMAGE_TAG}
+    environment:
+      BIND_HOST: 0.0.0.0
+      SERVICE_B_URL: http://service-b:3002
+      SERVICE_C_URL: http://service-c:3003
+    depends_on:
+      - service-b
+      - service-c
+    networks:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+  service-b:
+    image: ${DOCKERHUB_USERNAME}/${APP_NAME}-service-b:${IMAGE_TAG}
+    environment:
+      BIND_HOST: 0.0.0.0
+      SERVICE_C_URL: http://service-c:3003
+    networks:
+      - backend
+    restart: unless-stopped
+
+  service-c:
+    image: ${DOCKERHUB_USERNAME}/${APP_NAME}-service-c:${IMAGE_TAG}
+    environment:
+      BIND_HOST: 0.0.0.0
+    networks:
+      - backend
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx-docker.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - service-a
+    networks:
+      - frontend
+    restart: unless-stopped
+
+networks:
+  frontend:
+  backend:
+    internal: true

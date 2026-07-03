@@ -7,8 +7,15 @@ import sys
 
 app = Flask(__name__)
 
-SERVICE_NAME = "service-a"
-PORT = 3001
+SERVICE_NAME = "service-b"
+PORT = 3002
+
+
+def build_service_url(base_url, path):
+    base = base_url.rstrip("/")
+    normalized_path = path.lstrip("/")
+    return f"{base}/{normalized_path}" if normalized_path else base
+
 
 def log_event(event, **kwargs):
     """Structured JSON logging"""
@@ -31,54 +38,42 @@ def health():
         "message": f"Hello {SERVICE_NAME} listening on {PORT}"
     }), 200
 
-@app.route('/greet-service-b', methods=['GET'])
-def greet_service_b():
+@app.route('/greet', methods=['GET'])
+def greet():
     request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
     
-    log_event("request_received", 
+    log_event("request_received",
               request_id=request_id,
               method="GET",
-              path="/greet-service-b",
+              path="/greet",
               status=200)
     
     try:
-        # Call Service B
+        # Forward to Service C
         response = requests.get(
-            'http://service-b.internal:3002/greet',
+            build_service_url('http://service-c:3003', '/greet-c'),
             headers={'X-Request-ID': request_id},
             timeout=5
         )
         
-        log_event("downstream_call_success",
+        log_event("request_forwarded",
                   request_id=request_id,
-                  target="service-b",
+                  target="service-c",
                   status=response.status_code)
         
         return jsonify({
             "request_id": request_id,
-            "status": "success",
-            "message": "Request completed successfully"
+            "status": "forwarded",
+            "target": "service-c"
         }), 200
         
     except Exception as e:
         log_event("downstream_call_failed",
                   request_id=request_id,
-                  target="service-b",
+                  target="service-c",
                   error=str(e),
                   status=500)
         return jsonify({"error": str(e)}), 500
-
-@app.route('/greeting-rcvd', methods=['POST'])
-def greeting_rcvd():
-    data = request.json
-    request_id = data.get('request_id', 'unknown')
-    
-    log_event("callback_received",
-              request_id=request_id,
-              source_service=data.get('source_service'),
-              status=200)
-    
-    return jsonify({"status": "received"}), 200
 
 @app.errorhandler(404)
 def not_found(e):
@@ -91,4 +86,5 @@ def not_found(e):
 
 if __name__ == '__main__':
     log_event("service_starting", port=PORT)
-    app.run(host='127.0.0.1', port=PORT, debug=False)
+    bind_host = '127.0.0.1' if '--loopback' in sys.argv else '0.0.0.0'
+    app.run(host=bind_host, port=PORT, debug=False)

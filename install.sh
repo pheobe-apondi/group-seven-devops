@@ -15,6 +15,7 @@ sleep 2
 # 1. Install system dependencies
 echo "[*] Installing system packages..."
 sudo apt update
+sudo apt install -y ufw >/dev/null 2>&1 || true
 
 # Remove any conflicting Debian-managed Python packages
 echo "[*] Cleaning up conflicting packages..."
@@ -55,7 +56,7 @@ After=service-b.service service-c.service
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_a.py
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service-a/service_a.py --loopback
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -74,7 +75,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_b.py
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service-b/service_b.py --loopback
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -93,7 +94,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_c.py
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service-c/service_c.py --loopback
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -108,25 +109,64 @@ echo "[+] Systemd services installed"
 
 # 5. Configure Nginx
 echo "[*] Configuring Nginx..."
-sudo cp nginx/default.conf /etc/nginx/sites-available/default
-sudo nginx -t > /dev/null && echo "[+] Nginx config valid"
-sudo systemctl restart nginx
-echo "[+] Nginx configured and running"
 
-# 6. Enable services
+# Ensure log directories exist with proper permissions
+sudo mkdir -p /var/log/nginx
+sudo chmod 755 /var/log/nginx
+
+# Copy Nginx configuration
+sudo cp nginx/default.conf /etc/nginx/sites-available/default
+
+# Validate configuration
+sudo nginx -t > /dev/null && echo "[+] Nginx config valid"
+
+# Set up log rotation for JSON trace logs
+sudo bash -c 'cat > /etc/logrotate.d/nginx-json << EOF
+/var/log/nginx/access.json
+/var/log/nginx/error.json
+{
+  daily
+  rotate 7
+  compress
+  delaycompress
+  notifempty
+  create 0640 www-data adm
+  sharedscripts
+  postrotate
+    if [ -f /var/run/nginx.pid ]; then
+      kill -USR1 \`cat /var/run/nginx.pid\`
+    fi
+  endscript
+}
+EOF'
+
+# Restart Nginx
+sudo systemctl restart nginx
+echo "[+] Nginx configured with structured JSON trace logging"
+
+# 6. Configure firewall for network security
+echo "[*] Configuring host firewall..."
+sudo ufw --force reset >/dev/null 2>&1 || true
+sudo ufw default deny incoming >/dev/null 2>&1 || true
+sudo ufw default allow outgoing >/dev/null 2>&1 || true
+sudo ufw allow 80/tcp >/dev/null 2>&1 || true
+sudo ufw --force enable >/dev/null 2>&1 || true
+echo "[+] Firewall configured"
+
+# 7. Enable services
 echo "[*] Enabling services..."
 sudo systemctl enable service-a service-b service-c
 echo "[+] Services enabled"
 
-# 7. Start services (order matters!)
+# 8. Start services (order matters!)
 echo "[*] Starting services..."
 sudo systemctl start service-b service-c service-a
 echo "[+] Services started"
 
-# 8. Wait for startup
+# 9. Wait for startup
 sleep 3
 
-# 9. Verify
+# 10. Verify
 echo "[*] Verifying installation..."
 
 if curl -s http://127.0.0.1:3001/health > /dev/null; then
@@ -156,10 +196,25 @@ else
     exit 1
 fi
 
-echo ""
-echo "[+] Installation complete!"
-echo ""
+if [ -f /var/log/nginx/access.json ]; then
+    echo "[+] Nginx trace logging: OK"
+else
+    echo "[-] Nginx trace logging: Not yet active (will activate on first request)"
+fi
+
 echo "Next steps:"
 echo "  Test full flow: curl http://localhost/service-a/greet-service-b"
-echo "  View logs: journalctl -u service-a -f"
-echo "  Check status: systemctl status service-a service-b service-c"
+echo ""
+echo "View structured logs for request tracing:"
+echo "  Service A logs: journalctl -u service-a -f"
+echo "  Service B logs: journalctl -u service-b -f"
+echo "  Service C logs: journalctl -u service-c -f"
+echo "  Nginx trace logs: tail -f /var/log/nginx/access.json"
+echo "  Nginx errors: tail -f /var/log/nginx/error.json"
+echo ""
+echo "Trace a request through the system:"
+echo "  1. Make a request: curl http://localhost/service-a/greet-service-b"
+echo "  2. Copy the request_id from the response"
+echo "  3. Find it in logs: grep 'request_id' /var/log/nginx/access.json"
+echo ""
+echo "System status: systemctl status service-a service-b service-c nginx"
