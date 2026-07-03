@@ -9,6 +9,7 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(service_a)
 
 
+
 class ServiceATests(unittest.TestCase):
     def test_build_service_url_normalizes_paths(self):
         self.assertEqual(
