@@ -641,6 +641,41 @@ docker run -p 3001:3001 your-username/group-seven-devops-service-a:sha-a1b2c3d
 
 ---
 
+## Container CI/CD Deployment
+
+### Latest deployed version
+
+Commit:
+`47d615e13a2baeb6eb3fa521d7a127f0ee7156ec`
+
+Image tag:
+`sha-47d615e`
+
+Images:
+- `pheobeapondi/group-seven-devops-service-a:sha-47d615e`
+- `pheobeapondi/group-seven-devops-service-b:sha-47d615e`
+- `pheobeapondi/group-seven-devops-service-c:sha-47d615e`
+
+Published by GitHub Actions run: https://github.com/pheobe-apondi/group-seven-devops/actions/runs/28683563397
+
+### Deploy
+
+```bash
+cp .env.example .env
+export DOCKERHUB_USERNAME=pheobeapondi
+export APP_NAME=group-seven-devops
+./scripts/deploy.sh sha-47d615e
+```
+
+### Verify
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost:8080/service-a/health
+```
+
+---
+
 ## Service Management
 
 ### Start Services
