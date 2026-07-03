@@ -573,6 +573,26 @@ curl http://localhost/service-a/health
 
 ## Container Deployment (Docker)
 
+### Installing Docker
+
+**Ubuntu:**
+```bash
+sudo apt install docker-compose-v2 docker.io
+sudo usermod -aG docker $USER
+newgrp docker
+sudo systemctl start docker
+docker --version
+```
+> If `docker.io` installs `podman-docker` instead of real Docker, see [Troubleshooting Docker Compose](#troubleshooting-guide) below.
+
+**macOS:**
+```bash
+brew install --cask docker
+open /Applications/Docker.app
+```
+
+**Windows:** Download and install [Docker Desktop](https://www.docker.com/products/docker-desktop).
+
 ### Using Docker Compose (Development)
 
 ```bash
@@ -593,6 +613,13 @@ docker compose logs -f service-c
 
 # Stop
 docker compose down -v
+```
+
+Nginx listens on port 8080 and is the only public entry point. Confirm B and C stay internal:
+
+```bash
+curl --connect-timeout 3 http://localhost:3002/health   # connection refused
+curl --connect-timeout 3 http://localhost:3003/health   # connection refused
 ```
 
 ### Using Docker Compose (Production)
@@ -638,6 +665,18 @@ Images are automatically built and published by GitHub Actions on push to main:
 docker pull your-username/group-seven-devops-service-a:sha-a1b2c3d
 docker run -p 3001:3001 your-username/group-seven-devops-service-a:sha-a1b2c3d
 ```
+
+### Key Differences from the Systemd Host Deployment
+
+| VM (systemd) | Docker Compose |
+|---|---|
+| systemd manages services | Compose manages containers |
+| `/etc/hosts` for service discovery | Compose DNS (service names) |
+| `journalctl` for logs | `docker compose logs` |
+| UFW + loopback binding | Docker networks + no published ports |
+| Port 80 public | Port 8080 public |
+
+See [docs/CONTAINER_VALIDATION.md](docs/CONTAINER_VALIDATION.md) for full validation evidence.
 
 ---
 
@@ -1251,6 +1290,47 @@ ss -tlnp | grep -E ':(3001|3002|3003)'
 sudo systemctl restart service-a service-b service-c
 ```
 
+### Issue: `docker compose` Not Found / Routes to Podman
+
+Symptom: `Error: unrecognized command 'podman compose'`
+
+Cause: `docker.io` installed `podman-docker` (a shim) instead of real Docker.
+
+Fix:
+```bash
+sudo apt install docker-compose-v2 docker.io
+```
+This removes `podman-docker` and installs the real Docker engine with the Compose plugin.
+
+### Issue: Docker Daemon Fails to Start After Install
+
+Symptom: `Job for docker.service failed` / `failed to load listeners: no sockets found via socket activation`
+
+Cause: Leftover Podman socket state prevents Docker's socket activation from working.
+
+Fix — start the socket unit first, then the service:
+```bash
+sudo systemctl stop docker.socket docker.service
+sudo systemctl reset-failed docker.service docker.socket
+sudo systemctl start docker.socket
+sudo systemctl start docker.service
+sudo systemctl status docker.service
+```
+
+### Issue: Permission Denied on Docker Socket
+
+Symptom: `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock`
+
+Cause: Your user is not in the `docker` group.
+
+Fix:
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+`newgrp docker` applies the group in the current shell without logging out — you only need to do this once.
+
 ---
 
 ## Service Recovery
@@ -1813,242 +1893,6 @@ For troubleshooting, see the [Troubleshooting Guide](#troubleshooting-guide) sec
 For architecture questions, refer to [System Architecture](#system-architecture).
 For deployment questions, see [Host Deployment](#host-deployment-systemd) or [Container Deployment](#container-deployment-docker).
 
-### Scenario 2: 502 Error from Nginx
-
-**Symptoms:** `curl http://localhost/service-a/health` returns 502 or connection error
-
-**Investigation steps:**
-
-```bash
-# 1. Check if Service A is running
-systemctl status service-a
-
-# 2. Check Service A logs for startup errors
-journalctl -u service-a -n 20
-
-# 3. Verify Service A is listening on the right port
-netstat -tlnp | grep 3001
-
-# 4. Test Service A directly (bypassing Nginx)
-curl http://127.0.0.1:3001/health
-
-# 5. Check Nginx logs
-sudo tail -f /var/log/nginx/error.log
-
-# 6. Verify Nginx config is valid
-sudo nginx -t
-
-# 7. Restart Nginx if config is valid
-sudo systemctl restart nginx
-
-# 8. Test again
-curl http://localhost/service-a/health
-```
-
-**Common causes and fixes:**
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `curl http://127.0.0.1:3001/health` works but `curl http://localhost/service-a/health` fails | Nginx not running or misconfigured | `sudo systemctl restart nginx && sudo nginx -t` |
-| `systemctl status service-a` shows failed | Service crashed on startup | `journalctl -u service-a -n 30` to see error |
-| Port 3001 already in use | Another process using the port | `sudo lsof -i :3001` to find it |
-| Python/Flask not installed | Missing dependencies | `pip3 install --break-system-packages flask requests` |
-
----
-
-### Scenario 3: Service Discovery Failure
-
-**Symptoms:** Service A logs show `Failed to resolve 'service-b.internal'`
-
-**Investigation steps:**
-
-```bash
-# 1. Check /etc/hosts entries
-cat /etc/hosts | grep service
-
-# 2. Test DNS resolution manually
-nslookup service-b.internal
-
-# 3. Try ping (another test)
-ping -c 1 service-b.internal
-
-# 4. Check what should be there
-cat /etc/hosts
-# Should show:
-# 127.0.0.1 service-a.internal
-# 127.0.0.1 service-b.internal
-# 127.0.0.1 service-c.internal
-
-# 5. If missing, add them
-sudo bash -c 'cat >> /etc/hosts << EOF
-127.0.0.1 service-a.internal
-127.0.0.1 service-b.internal
-127.0.0.1 service-c.internal
-EOF'
-
-# 6. Verify they were added
-cat /etc/hosts | tail -3
-
-# 7. Test resolution again
-nslookup service-b.internal
-
-# 8. Restart services to pick up changes
-sudo systemctl restart service-a service-b service-c
-```
-
-**Verify the fix:**
-```bash
-curl http://localhost/service-a/greet-service-b
-journalctl -u service-a | tail -20
-```
-
----
-
-### Scenario 4: Failed Service A Startup
-
-**Symptoms:** `systemctl status service-a` shows `failed (Result: exit-code)`
-
-**Investigation steps:**
-
-```bash
-# 1. Check service status
-systemctl status service-a
-
-# 2. Get detailed startup logs
-journalctl -u service-a -n 50 --no-pager
-
-# 3. Check if dependencies are available
-systemctl status service-b
-systemctl status service-c
-
-# 4. Check if port 3001 is in use
-netstat -tlnp | grep 3001
-# If something else uses it: sudo lsof -i :3001
-
-# 5. Verify working directory exists
-ls -la $(systemctl cat service-a | grep WorkingDirectory | cut -d= -f2)
-
-# 6. Verify Python and Flask are installed
-python3 --version
-pip3 list | grep flask
-
-# 7. Try running the service manually to see the real error
-python3 $(systemctl cat service-a | grep ExecStart | cut -d= -f2 | awk '{print $2}')
-
-# 8. If manual run works but systemd fails, check service file
-systemctl cat service-a
-```
-
-**Common causes and fixes:**
-
-| Cause | Fix |
-|-------|-----|
-| Dependencies (B, C) not started | `sudo systemctl start service-b service-c` |
-| Python not installed | `sudo apt install python3 python3-pip` |
-| Flask/requests not installed | `pip3 install --break-system-packages flask requests` |
-| Port 3001 already in use | `sudo lsof -i :3001` and kill the process |
-| Service file syntax error | `systemctl cat service-a` and fix any issues |
-| Permission denied | Ensure file ownership is correct |
-
----
-
-### Request Tracing Example
-
-To troubleshoot a specific request that failed:
-
-```bash
-# 1. Trigger a request and capture the ID
-RESPONSE=$(curl -s http://localhost/service-a/greet-service-b)
-REQUEST_ID=$(echo $RESPONSE | jq -r .request_id)
-echo "Request ID: $REQUEST_ID"
-
-# 2. Search all service logs for this ID
-echo ""
-echo "=== Service A logs ==="
-journalctl -u service-a | grep $REQUEST_ID
-
-echo ""
-echo "=== Service B logs ==="
-journalctl -u service-b | grep $REQUEST_ID
-
-echo ""
-echo "=== Service C logs ==="
-journalctl -u service-c | grep $REQUEST_ID
-
-# 3. Analyze the flow
-# Expected order:
-# - A: request_received
-# - B: request_received
-# - C: request_received
-# - C: callback_sent
-# - A: callback_received
-# - A: downstream_call_success
-
-# If any service is missing logs for this ID, the request didn't reach it
-```
-
----
-
-### Health Check Procedure
-
-Run this to verify everything is working:
-
-```bash
-#!/bin/bash
-echo "=== System Health Check ==="
-
-echo "Checking services..."
-systemctl status service-a service-b service-c | grep -E "Active|Loaded"
-
-echo ""
-echo "Testing service health endpoints..."
-echo -n "Service A: "
-curl -s http://127.0.0.1:3001/health | jq .status
-
-echo -n "Service B: "
-curl -s http://127.0.0.1:3002/health | jq .status
-
-echo -n "Service C: "
-curl -s http://127.0.0.1:3003/health | jq .status
-
-echo ""
-echo "Testing full request flow..."
-RESPONSE=$(curl -s http://localhost/service-a/greet-service-b)
-REQUEST_ID=$(echo $RESPONSE | jq -r .request_id)
-STATUS=$(echo $RESPONSE | jq -r .status)
-
-echo "Request ID: $REQUEST_ID"
-echo "Status: $STATUS"
-
-if [ "$STATUS" == "success" ]; then
-    echo "✓ Full flow works"
-else
-    echo "✗ Full flow failed"
-    exit 1
-fi
-
-echo ""
-echo "Checking service discovery..."
-for SERVICE in service-a.internal service-b.internal service-c.internal; do
-    if nslookup $SERVICE > /dev/null 2>&1; then
-        echo "✓ $SERVICE resolves"
-    else
-        echo "✗ $SERVICE does not resolve"
-    fi
-done
-
-echo ""
-echo "Checking network isolation..."
-echo -n "Service B internal access: "
-curl -s http://127.0.0.1:3002/health > /dev/null && echo "✓ Works"
-
-echo -n "Service C internal access: "
-curl -s http://127.0.0.1:3003/health > /dev/null && echo "✓ Works"
-
-echo ""
-echo "=== Health check complete ==="
-```
-
 ## Verification Checklist
 
 - [ ] All three services start on boot: `sudo reboot && systemctl status service-*`
@@ -2094,155 +1938,4 @@ sudo systemctl restart service-a service-b service-c
 # Run health check
 bash health-check.sh
 ```
-
----
-
-## Running with Docker Compose
-
-The same production flow runs in Docker Compose without any VM or systemd setup required.
-
-### Prerequisites
-
-- Docker Engine
-- Docker Compose v2 (`docker compose` not `docker-compose`)
-
-**Install Docker on Ubuntu:**
-```bash
-sudo apt install docker-compose-v2 docker.io
-```
-
-> If `docker.io` installs `podman-docker` instead of real Docker, see [Troubleshooting Docker Compose](#troubleshooting-docker-compose) below.
-
-After install, add your user to the docker group so you don't need sudo:
-```bash
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-Verify Docker is running:
-```bash
-sudo systemctl start docker
-docker --version
-```
-
-**Install Docker on macOS:**
-```bash
-brew install --cask docker
-open /Applications/Docker.app
-```
-
-**Install Docker on Windows:**
-
-Download and install Docker Desktop from https://www.docker.com/products/docker-desktop
-
-### Start the system
-
-```bash
-docker compose up --build -d
-```
-
-This builds all service images and starts Nginx, Service A, Service B, and Service C.
-
-### Test the public route
-
-```bash
-curl http://localhost:8080/service-a/health
-curl http://localhost:8080/service-a/greet-service-b
-```
-
-Nginx listens on port 8080 and is the only public entry point.
-
-### Prove B and C are internal
-
-```bash
-curl --connect-timeout 3 http://localhost:3002/health   # connection refused
-curl --connect-timeout 3 http://localhost:3003/health   # connection refused
-```
-
-Services B and C publish no host ports — they are reachable only inside the Docker network.
-
-### View logs
-
-```bash
-docker compose logs -f
-docker compose logs service-a
-docker compose logs service-b
-docker compose logs service-c
-docker compose logs nginx
-```
-
-### Stop and restart a single service
-
-```bash
-docker compose stop service-b
-docker compose start service-b
-```
-
-### Shut everything down
-
-```bash
-docker compose down
-```
-
-### Troubleshooting Docker Compose
-
-**`docker compose` not found / routes to Podman**
-
-Symptom: `Error: unrecognized command 'podman compose'`
-
-Cause: `docker.io` installed `podman-docker` (a shim) instead of real Docker.
-
-Fix:
-```bash
-sudo apt install docker-compose-v2 docker.io
-```
-This removes `podman-docker` and installs the real Docker engine with the Compose plugin.
-
----
-
-**Docker daemon fails to start after install**
-
-Symptom: `Job for docker.service failed` / `failed to load listeners: no sockets found via socket activation`
-
-Cause: Leftover Podman socket state prevents Docker's socket activation from working.
-
-Fix — start the socket unit first, then the service:
-```bash
-sudo systemctl stop docker.socket docker.service
-sudo systemctl reset-failed docker.service docker.socket
-sudo systemctl start docker.socket
-sudo systemctl start docker.service
-sudo systemctl status docker.service
-```
-
----
-
-**Permission denied on Docker socket**
-
-Symptom: `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock`
-
-Cause: Your user is not in the `docker` group.
-
-Fix:
-```bash
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-`newgrp docker` applies the group in the current shell without logging out. You only need to do this once — future shells will have it automatically.
-
----
-
-### Key differences from the VM version
-
-| VM (systemd) | Docker Compose |
-|---|---|
-| systemd manages services | Compose manages containers |
-| `/etc/hosts` for service discovery | Compose DNS (service names) |
-| `journalctl` for logs | `docker compose logs` |
-| UFW + loopback binding | Docker networks + no published ports |
-| Port 80 public | Port 8080 public |
-
-See [docs/CONTAINER_VALIDATION.md](docs/CONTAINER_VALIDATION.md) for full validation evidence.
-
 
