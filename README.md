@@ -8,6 +8,7 @@ A complete, production-ready example of three HTTP microservices running on Linu
 
 ### Quick Start
 - [Overview](#overview)
+- [Before You Start — Choose Your OS Setup Guide](#before-you-start--choose-your-os-setup-guide)
 - [Quick Start (5 minutes)](#quick-start-5-minutes)
 - [Environment Requirements](#environment-requirements)
 
@@ -65,6 +66,24 @@ This project demonstrates a production-ready microservices system with:
 - How to secure internal services from external access
 - How systemd manages long-running services
 - How to implement production-grade logging
+
+---
+
+## Before You Start — Choose Your OS Setup Guide
+
+**⚠️ Important:** This project runs on **Ubuntu 24.04 LTS** inside a dedicated VM. Do not run it on a shared or existing VM — `install.sh` writes to `/etc/hosts`, installs systemd units, and modifies Nginx config.
+
+The original development environment was a fresh Ubuntu 24.04 LTS instance with no prior services installed. Replicate that baseline before running the installer.
+
+**Pick your host OS to get started:**
+
+| Host OS | Setup Guide |
+|---|---|
+| macOS | [docs/setup-macos.md](docs/setup-macos.md) |
+| Linux | [docs/setup-linux.md](docs/setup-linux.md) |
+| Windows | [docs/setup-windows.md](docs/setup-windows.md) |
+
+These guides walk through creating a fresh Ubuntu 24.04 LTS VM (or WSL) with the correct baseline.
 
 ---
 
