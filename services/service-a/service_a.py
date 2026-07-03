@@ -124,4 +124,5 @@ def not_found(e):
 
 if __name__ == '__main__':
     log_event("service_starting", port=PORT)
-    app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
+    bind_host = '127.0.0.1' if '--loopback' in sys.argv else '0.0.0.0'
+    app.run(host=bind_host, port=PORT, debug=False, threaded=True)

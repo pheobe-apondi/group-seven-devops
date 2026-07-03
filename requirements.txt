@@ -1,2 +1,8 @@
+# Production-Style Microservices Environment
+# Python 3.12+
+
+# Web framework for HTTP services
 flask>=3.0,<4.0
+
+# HTTP client for inter-service communication
 requests>=2.31,<3.0
