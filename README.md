@@ -83,15 +83,15 @@ Image tag:
 `sha-<short-commit-hash>`
 
 Images:
-- `<dockerhub-username>/<repo-name>-service-a:sha-<short-commit-hash>`
-- `<dockerhub-username>/<repo-name>-service-b:sha-<short-commit-hash>`
-- `<dockerhub-username>/<repo-name>-service-c:sha-<short-commit-hash>`
+- `<dockerhub-username>/group-seven-devops-service-a:sha-<short-commit-hash>`
+- `<dockerhub-username>/group-seven-devops-service-b:sha-<short-commit-hash>`
+- `<dockerhub-username>/group-seven-devops-service-c:sha-<short-commit-hash>`
 
 ### Deploy
 ```bash
 cp .env.example .env
 export DOCKERHUB_USERNAME=<dockerhub-username>
-export APP_NAME=<repo-name>
+export APP_NAME=group-seven-devops
 ./scripts/deploy.sh sha-<short-commit-hash>
 ```
 
