@@ -13,8 +13,8 @@ services:
 
   service-a:
     build:
-      context: ./services/service-a
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/service-a/Dockerfile
     environment:
       BIND_HOST: 0.0.0.0
       SERVICE_B_URL: http://service-b:3002
@@ -29,8 +29,8 @@ services:
 
   service-b:
     build:
-      context: ./services/service-b
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/service-b/Dockerfile
     environment:
       BIND_HOST: 0.0.0.0
       SERVICE_C_URL: http://service-c:3003
@@ -40,8 +40,8 @@ services:
 
   service-c:
     build:
-      context: ./services/service-c
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/service-c/Dockerfile
     environment:
       BIND_HOST: 0.0.0.0
     restart: unless-stopped

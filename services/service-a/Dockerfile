@@ -9,7 +9,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r /tmp/requirements.txt
 
-COPY . /app
+COPY services/service-a/ /app/
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 USER appuser

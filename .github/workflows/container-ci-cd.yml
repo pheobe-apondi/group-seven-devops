@@ -47,12 +47,16 @@ jobs:
         run: |
           python -m pytest -q tests || python -m unittest discover -s tests -p 'test_*.py'
 
+      - name: Build Python code
+        working-directory: ${{ matrix.path }}
+        run: python -m compileall .
+
       - name: Build Docker image locally
         run: |
           docker build \
             -t ${{ matrix.service }}:${{ github.sha }} \
             -f ${{ matrix.path }}/Dockerfile \
-            ${{ matrix.path }}
+            .
 
   verify-compose:
     name: Verify Docker Compose stack
@@ -115,7 +119,7 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.path }}
+          context: .
           file: ${{ matrix.path }}/Dockerfile
           push: true
           tags: |
