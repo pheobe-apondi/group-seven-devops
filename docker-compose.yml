@@ -1,6 +1,6 @@
 services:
   nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     ports:
       - "8080:80"
     volumes:
@@ -9,41 +9,46 @@ services:
       - service-a
     restart: unless-stopped
     networks:
-      - internal
+      - frontend
 
   service-a:
     build:
-      context: .
-      args:
-        SERVICE_FILE: service_a.py
+      context: ./services/service-a
+      dockerfile: Dockerfile
     environment:
-      - SERVICE_FILE=service_a.py
+      BIND_HOST: 0.0.0.0
+      SERVICE_B_URL: http://service-b:3002
+      SERVICE_C_URL: http://service-c:3003
+    depends_on:
+      - service-b
+      - service-c
     restart: unless-stopped
     networks:
-      - internal
+      - frontend
+      - backend
 
   service-b:
     build:
-      context: .
-      args:
-        SERVICE_FILE: service_b.py
+      context: ./services/service-b
+      dockerfile: Dockerfile
     environment:
-      - SERVICE_FILE=service_b.py
+      BIND_HOST: 0.0.0.0
+      SERVICE_C_URL: http://service-c:3003
     restart: unless-stopped
     networks:
-      - internal
+      - backend
 
   service-c:
     build:
-      context: .
-      args:
-        SERVICE_FILE: service_c.py
+      context: ./services/service-c
+      dockerfile: Dockerfile
     environment:
-      - SERVICE_FILE=service_c.py
+      BIND_HOST: 0.0.0.0
     restart: unless-stopped
     networks:
-      - internal
+      - backend
 
 networks:
-  internal:
-    driver: bridge
+  frontend:
+  backend:
+    internal: true

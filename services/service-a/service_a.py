@@ -11,6 +11,13 @@ app = Flask(__name__)
 SERVICE_NAME = "service-a"
 PORT = 3001
 
+
+def build_service_url(base_url, path):
+    base = base_url.rstrip("/")
+    normalized_path = path.lstrip("/")
+    return f"{base}/{normalized_path}" if normalized_path else base
+
+
 def log_event(event, **kwargs):
     """Structured JSON logging"""
     log_entry = {
@@ -51,7 +58,7 @@ def greet_service_b():
 
     try:
         response = requests.get(
-            'http://service-b:3002/greet',
+            build_service_url('http://service-b:3002', '/greet'),
             headers={'X-Request-ID': request_id},
             timeout=5
         )

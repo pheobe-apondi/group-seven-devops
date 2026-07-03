@@ -7,8 +7,15 @@ import sys
 
 app = Flask(__name__)
 
-SERVICE_NAME = "service-c"
-PORT = 3003
+SERVICE_NAME = "service-b"
+PORT = 3002
+
+
+def build_service_url(base_url, path):
+    base = base_url.rstrip("/")
+    normalized_path = path.lstrip("/")
+    return f"{base}/{normalized_path}" if normalized_path else base
+
 
 def log_event(event, **kwargs):
     """Structured JSON logging"""
@@ -31,47 +38,39 @@ def health():
         "message": f"Hello {SERVICE_NAME} listening on {PORT}"
     }), 200
 
-@app.route('/greet-c', methods=['GET'])
-def greet_c():
+@app.route('/greet', methods=['GET'])
+def greet():
     request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
     
     log_event("request_received",
               request_id=request_id,
               method="GET",
-              path="/greet-c",
+              path="/greet",
               status=200)
     
     try:
-        # Send callback to Service A
-        callback_data = {
-            "request_id": request_id,
-            "source_service": SERVICE_NAME,
-            "message": "Greeting processed",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
-        
-        response = requests.post(
-            'http://service-a:3001/greeting-rcvd',
-            json=callback_data,
+        # Forward to Service C
+        response = requests.get(
+            build_service_url('http://service-c:3003', '/greet-c'),
             headers={'X-Request-ID': request_id},
             timeout=5
         )
         
-        log_event("callback_sent",
+        log_event("request_forwarded",
                   request_id=request_id,
-                  target="service-a",
+                  target="service-c",
                   status=response.status_code)
         
         return jsonify({
             "request_id": request_id,
-            "status": "processed",
-            "callback_sent": True
+            "status": "forwarded",
+            "target": "service-c"
         }), 200
         
     except Exception as e:
-        log_event("callback_failed",
+        log_event("downstream_call_failed",
                   request_id=request_id,
-                  target="service-a",
+                  target="service-c",
                   error=str(e),
                   status=500)
         return jsonify({"error": str(e)}), 500

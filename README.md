@@ -73,6 +73,34 @@ The `reset.sh` script:
 
 See [Installation](#installation) section below.
 
+## Container CI/CD Deployment
+
+### Latest deployed version
+Commit:
+`<full-commit-hash>`
+
+Image tag:
+`sha-<short-commit-hash>`
+
+Images:
+- `<dockerhub-username>/<repo-name>-service-a:sha-<short-commit-hash>`
+- `<dockerhub-username>/<repo-name>-service-b:sha-<short-commit-hash>`
+- `<dockerhub-username>/<repo-name>-service-c:sha-<short-commit-hash>`
+
+### Deploy
+```bash
+cp .env.example .env
+export DOCKERHUB_USERNAME=<dockerhub-username>
+export APP_NAME=<repo-name>
+./scripts/deploy.sh sha-<short-commit-hash>
+```
+
+### Verify
+```bash
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost:8080/service-a/health
+```
+
 ## Architecture
 
 ```

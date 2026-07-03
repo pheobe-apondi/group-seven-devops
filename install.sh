@@ -55,7 +55,7 @@ After=service-b.service service-c.service
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_a.py
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service-a/service_a.py
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -74,7 +74,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_b.py
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service-b/service_b.py
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -93,7 +93,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service_c.py
+ExecStart=/usr/bin/python3 $PROJECT_DIR/services/service-c/service_c.py
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
