@@ -732,17 +732,17 @@ See [docs/CONTAINER_VALIDATION.md](docs/CONTAINER_VALIDATION.md) for full valida
 ### Latest deployed version
 
 Commit:
-`47d615e13a2baeb6eb3fa521d7a127f0ee7156ec`
+`9ff648faedc5b00aaa536f32c358613c1b4bf033`
 
 Image tag:
-`sha-47d615e`
+`sha-9ff648f`
 
 Images:
-- `pheobeapondi/group-seven-devops-service-a:sha-47d615e`
-- `pheobeapondi/group-seven-devops-service-b:sha-47d615e`
-- `pheobeapondi/group-seven-devops-service-c:sha-47d615e`
+- `pheobeapondi/group-seven-devops-service-a:sha-9ff648f`
+- `pheobeapondi/group-seven-devops-service-b:sha-9ff648f`
+- `pheobeapondi/group-seven-devops-service-c:sha-9ff648f`
 
-Published by GitHub Actions run: https://github.com/pheobe-apondi/group-seven-devops/actions/runs/28683563397
+Published by GitHub Actions run: https://github.com/pheobe-apondi/group-seven-devops/actions/runs/28684908600
 
 ### Deploy
 
@@ -750,7 +750,7 @@ Published by GitHub Actions run: https://github.com/pheobe-apondi/group-seven-de
 cp .env.example .env
 export DOCKERHUB_USERNAME=pheobeapondi
 export APP_NAME=group-seven-devops
-./scripts/deploy.sh sha-47d615e
+./scripts/deploy.sh sha-9ff648f
 ```
 
 ### Verify
@@ -766,16 +766,16 @@ These are the exact commands to independently verify the published images and th
 
 **1. Pull the images directly (proves they're on Docker Hub, no local build needed):**
 ```bash
-docker pull pheobeapondi/group-seven-devops-service-a:sha-47d615e
-docker pull pheobeapondi/group-seven-devops-service-b:sha-47d615e
-docker pull pheobeapondi/group-seven-devops-service-c:sha-47d615e
+docker pull pheobeapondi/group-seven-devops-service-a:sha-9ff648f
+docker pull pheobeapondi/group-seven-devops-service-b:sha-9ff648f
+docker pull pheobeapondi/group-seven-devops-service-c:sha-9ff648f
 ```
 
 **2. Inspect image metadata (proves commit traceability via labels):**
 ```bash
-docker image inspect pheobeapondi/group-seven-devops-service-a:sha-47d615e \
+docker image inspect pheobeapondi/group-seven-devops-service-a:sha-9ff648f \
   | jq '.[] | {Labels: .Config.Labels}'
-# Expect org.opencontainers.image.revision == 47d615e13a2baeb6eb3fa521d7a127f0ee7156ec
+# Expect org.opencontainers.image.revision == 9ff648faedc5b00aaa536f32c358613c1b4bf033
 ```
 
 **3. Validate the production Compose file (proves it uses `image:`, not `build:`):**
@@ -785,13 +785,13 @@ cd group-seven-devops
 cp .env.example .env
 export DOCKERHUB_USERNAME=pheobeapondi
 export APP_NAME=group-seven-devops
-export IMAGE_TAG=sha-47d615e
+export IMAGE_TAG=sha-9ff648f
 docker compose -f docker-compose.prod.yml config
 ```
 
 **4. Deploy and verify the running stack:**
 ```bash
-./scripts/deploy.sh sha-47d615e
+./scripts/deploy.sh sha-9ff648f
 docker compose -f docker-compose.prod.yml ps
 curl http://localhost:8080/service-a/health
 ```
