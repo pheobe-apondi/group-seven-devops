@@ -44,6 +44,8 @@ A complete, production-ready example of three HTTP microservices running on Linu
 ### CI/CD
 - [GitHub Actions Pipeline](#github-actions-pipeline)
 - [Docker Image Publishing](#docker-image-publishing)
+- [Container CI/CD Deployment](#container-cicd-deployment)
+- [How to Test This Deployment](#how-to-test-this-deployment)
 
 ---
 
@@ -711,6 +713,58 @@ export APP_NAME=group-seven-devops
 ```bash
 docker compose -f docker-compose.prod.yml ps
 curl http://localhost:8080/service-a/health
+```
+
+### How to Test This Deployment
+
+These are the exact commands to independently verify the published images and the deployment, using the current version above.
+
+**1. Pull the images directly (proves they're on Docker Hub, no local build needed):**
+```bash
+docker pull pheobeapondi/group-seven-devops-service-a:sha-47d615e
+docker pull pheobeapondi/group-seven-devops-service-b:sha-47d615e
+docker pull pheobeapondi/group-seven-devops-service-c:sha-47d615e
+```
+
+**2. Inspect image metadata (proves commit traceability via labels):**
+```bash
+docker image inspect pheobeapondi/group-seven-devops-service-a:sha-47d615e \
+  | jq '.[] | {Labels: .Config.Labels}'
+# Expect org.opencontainers.image.revision == 47d615e13a2baeb6eb3fa521d7a127f0ee7156ec
+```
+
+**3. Validate the production Compose file (proves it uses `image:`, not `build:`):**
+```bash
+git clone https://github.com/pheobe-apondi/group-seven-devops.git
+cd group-seven-devops
+cp .env.example .env
+export DOCKERHUB_USERNAME=pheobeapondi
+export APP_NAME=group-seven-devops
+export IMAGE_TAG=sha-47d615e
+docker compose -f docker-compose.prod.yml config
+```
+
+**4. Deploy and verify the running stack:**
+```bash
+./scripts/deploy.sh sha-47d615e
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost:8080/service-a/health
+```
+
+**5. Confirm only Nginx is reachable from the host (network isolation):**
+```bash
+curl --connect-timeout 3 http://localhost:3002/health   # should refuse
+curl --connect-timeout 3 http://localhost:3003/health   # should refuse
+```
+
+**6. Confirm the deploy script rejects a missing tag:**
+```bash
+./scripts/deploy.sh            # should exit 1 with a usage message
+```
+
+**7. Tear down:**
+```bash
+docker compose -f docker-compose.prod.yml down -v
 ```
 
 ---
