@@ -764,6 +764,12 @@ curl http://localhost:8080/service-a/health
 
 These are the exact commands to independently verify the published images and the deployment, using the current version above.
 
+**0. Prerequisite: Docker + Compose plugin installed.** See [Installing Docker](#container-deployment-docker) above. On Ubuntu, `docker.io` alone does *not* include the `docker compose` command — you also need `docker-compose-v2`, or `docker compose ...` will fail with a confusing `unknown shorthand flag` error:
+```bash
+sudo apt install -y docker.io docker-compose-v2
+docker compose version   # confirm it works before continuing
+```
+
 **1. Pull the images directly (proves they're on Docker Hub, no local build needed):**
 ```bash
 docker pull pheobeapondi/group-seven-devops-service-a:sha-47d615e
