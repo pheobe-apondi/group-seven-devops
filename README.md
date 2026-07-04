@@ -785,6 +785,8 @@ docker image inspect pheobeapondi/group-seven-devops-service-a:sha-47d615e \
 ```
 
 **3. Validate the production Compose file (proves it uses `image:`, not `build:`):**
+
+If you already have this repo cloned, skip the `git clone`/`cd` and just run the rest from your existing checkout.
 ```bash
 git clone https://github.com/pheobe-apondi/group-seven-devops.git
 cd group-seven-devops
