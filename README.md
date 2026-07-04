@@ -805,6 +805,11 @@ curl http://localhost:8080/service-a/health
 ```
 
 **5. Confirm only Nginx is reachable from the host (network isolation):**
+
+If you've also set up the [systemd host deployment](#host-deployment-systemd) on this same machine, stop it first — those services bind directly to 127.0.0.1:3001-3003 and would make this check pass even if Docker's isolation were broken:
+```bash
+sudo systemctl stop service-a service-b service-c 2>/dev/null || true
+```
 ```bash
 curl --connect-timeout 3 http://localhost:3002/health   # should refuse
 curl --connect-timeout 3 http://localhost:3003/health   # should refuse
