@@ -764,6 +764,12 @@ curl http://localhost:8080/service-a/health
 
 These are the exact commands to independently verify the published images and the deployment, using the current version above.
 
+**0. Prerequisite: Docker + Compose plugin installed.** See [Installing Docker](#container-deployment-docker) above. On Ubuntu, `docker.io` alone does *not* include the `docker compose` command — you also need `docker-compose-v2`, or `docker compose ...` will fail with a confusing `unknown shorthand flag` error:
+```bash
+sudo apt install -y docker.io docker-compose-v2
+docker compose version   # confirm it works before continuing
+```
+
 **1. Pull the images directly (proves they're on Docker Hub, no local build needed):**
 ```bash
 docker pull pheobeapondi/group-seven-devops-service-a:sha-47d615e
@@ -779,6 +785,8 @@ docker image inspect pheobeapondi/group-seven-devops-service-a:sha-47d615e \
 ```
 
 **3. Validate the production Compose file (proves it uses `image:`, not `build:`):**
+
+If you already have this repo cloned, skip the `git clone`/`cd` and just run the rest from your existing checkout.
 ```bash
 git clone https://github.com/pheobe-apondi/group-seven-devops.git
 cd group-seven-devops
