@@ -779,10 +779,10 @@ docker pull pheobeapondi/group-seven-devops-service-c:sha-47d615e
 
 **2. Inspect image metadata (proves commit traceability via labels):**
 ```bash
-docker image inspect pheobeapondi/group-seven-devops-service-a:sha-47d615e \
-  | jq '.[] | {Labels: .Config.Labels}'
+docker image inspect --format '{{json .Config.Labels}}' pheobeapondi/group-seven-devops-service-a:sha-47d615e
 # Expect org.opencontainers.image.revision == 47d615e13a2baeb6eb3fa521d7a127f0ee7156ec
 ```
+(Uses Docker's built-in `--format` instead of piping to `jq`, since `jq` isn't installed by default on Windows Git Bash.)
 
 **3. Validate the production Compose file (proves it uses `image:`, not `build:`):**
 
@@ -1956,8 +1956,7 @@ curl https://hub.docker.com/v2/repositories/your-username/group-seven-devops-ser
 docker pull your-username/group-seven-devops-service-a:sha-a1b2c3d
 
 # Inspect image metadata
-docker image inspect your-username/group-seven-devops-service-a:sha-a1b2c3d \
-  | jq '.[] | {Labels: .Config.Labels, CreatedAt: .Created}'
+docker image inspect --format '{{json .Config.Labels}}' your-username/group-seven-devops-service-a:sha-a1b2c3d
 ```
 
 ---
