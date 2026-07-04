@@ -42,6 +42,20 @@ else
     echo "[+] Service discovery entries already exist"
 fi
 
+# The service code itself calls peers by bare Docker Compose-style names
+# (e.g. http://service-b:3002), not the .internal names above, so those
+# also need to resolve on the host for the systemd deployment path.
+if ! grep -q "^127.0.0.1 service-a$" /etc/hosts; then
+    sudo bash -c 'cat >> /etc/hosts << EOFHOSTS
+127.0.0.1 service-a
+127.0.0.1 service-b
+127.0.0.1 service-c
+EOFHOSTS'
+    echo "[+] Bare service hostname entries added"
+else
+    echo "[+] Bare service hostname entries already exist"
+fi
+
 # 4. Install systemd services (with auto-detected path)
 echo "[*] Installing systemd service files..."
 
