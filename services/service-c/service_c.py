@@ -1,6 +1,14 @@
 from flask import Flask, request, jsonify
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
 import json
+import os
 import uuid
 import time
 from datetime import datetime
@@ -32,6 +40,22 @@ ERROR_COUNT = Counter(
 SERVICE_UP = Gauge("service_up", "Service is up (1) or down (0)", ["service"])
 SERVICE_UP.labels(service=SERVICE_NAME).set(1)
 
+# --- Distributed tracing (OpenTelemetry -> Jaeger via OTLP) ---
+JAEGER_OTLP_ENDPOINT = os.environ.get("JAEGER_OTLP_ENDPOINT", "http://jaeger:4318/v1/traces")
+
+if not isinstance(trace.get_tracer_provider(), TracerProvider):
+    trace.set_tracer_provider(TracerProvider(resource=Resource.create({"service.name": SERVICE_NAME})))
+trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=JAEGER_OTLP_ENDPOINT)))
+
+FlaskInstrumentor().instrument_app(app)
+RequestsInstrumentor().instrument()
+
+
+def get_trace_id():
+    """Hex-encoded trace ID of the current span, or None outside a request."""
+    ctx = trace.get_current_span().get_span_context()
+    return format(ctx.trace_id, "032x") if ctx and ctx.is_valid else None
+
 
 def build_service_url(base_url, path):
     base = base_url.rstrip("/")
@@ -39,25 +63,29 @@ def build_service_url(base_url, path):
     return f"{base}/{normalized_path}" if normalized_path else base
 
 
-def log_event(event, **kwargs):
+def log_event(event, level="info", **kwargs):
     log_entry = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "service": SERVICE_NAME,
+        "level": level,
         "event": event,
-        **kwargs
     }
+    trace_id = get_trace_id()
+    if trace_id:
+        log_entry["trace_id"] = trace_id
+    log_entry.update(kwargs)
     print(json.dumps(log_entry), file=sys.stdout)
     sys.stdout.flush()
 
 
 @app.route("/health", methods=["GET"])
 def health():
-    log_event("health_check", status=200)
+    log_event("health_check", status=200, overall="ok", dependencies={})
     return jsonify({
         "service": SERVICE_NAME,
-        "status": "healthy",
+        "status": "ok",
         "port": PORT,
-        "message": f"Hello {SERVICE_NAME} listening on {PORT}"
+        "dependencies": {}
     }), 200
 
 
@@ -103,16 +131,54 @@ def greet_c():
         REQUEST_COUNT.labels(service=SERVICE_NAME, method="GET", route=route, status_code="500").inc()
         ERROR_COUNT.labels(service=SERVICE_NAME, route=route).inc()
         REQUEST_DURATION.labels(service=SERVICE_NAME, method="GET", route=route).observe(duration)
-        log_event("callback_failed", request_id=request_id, target="service-a",
+        log_event("callback_failed", level="error", request_id=request_id, target="service-a",
                   error=str(e), status=500, duration_ms=round(duration * 1000, 2))
         return jsonify({"error": str(e)}), 500
+
+
+# --- Lab-only controlled failure endpoints (for observability/alerting testing) ---
+
+@app.route("/slow", methods=["GET"])
+def slow():
+    """Lab only: simulate a slow response to test p95 latency alerting."""
+    start = time.time()
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    route = "/slow"
+    delay = float(request.args.get("delay", 2))
+
+    log_event("slow_request_start", level="warn", request_id=request_id, delay_s=delay)
+    time.sleep(delay)
+
+    duration = time.time() - start
+    REQUEST_COUNT.labels(service=SERVICE_NAME, method="GET", route=route, status_code="200").inc()
+    REQUEST_DURATION.labels(service=SERVICE_NAME, method="GET", route=route).observe(duration)
+    log_event("slow_request_complete", request_id=request_id, method="GET", path=route,
+              status=200, duration_ms=round(duration * 1000, 2))
+    return jsonify({"request_id": request_id, "delayed_s": delay}), 200
+
+
+@app.route("/fail", methods=["GET"])
+def fail():
+    """Lab only: always returns 500 to test error rate alerting."""
+    start = time.time()
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    route = "/fail"
+
+    duration = time.time() - start
+    REQUEST_COUNT.labels(service=SERVICE_NAME, method="GET", route=route, status_code="500").inc()
+    ERROR_COUNT.labels(service=SERVICE_NAME, route=route).inc()
+    REQUEST_DURATION.labels(service=SERVICE_NAME, method="GET", route=route).observe(duration)
+    log_event("forced_failure", level="error", request_id=request_id, method="GET", path=route,
+              status=500, duration_ms=round(duration * 1000, 2),
+              error="forced failure for observability testing")
+    return jsonify({"error": "forced failure", "request_id": request_id}), 500
 
 
 @app.errorhandler(404)
 def not_found(e):
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     REQUEST_COUNT.labels(service=SERVICE_NAME, method=request.method, route=request.path, status_code="404").inc()
-    log_event("route_not_found", request_id=request_id, path=request.path, status=404)
+    log_event("route_not_found", level="warn", request_id=request_id, path=request.path, status=404)
     return jsonify({"error": "Not found"}), 404
 
 
