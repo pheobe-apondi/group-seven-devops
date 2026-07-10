@@ -856,6 +856,12 @@ Alertmanager's default receiver has no external channel configured yet (no Slack
 webhook wired up) — alerts are fully visible and queryable, just not paged anywhere. See
 [`alertmanager/alertmanager.yml`](alertmanager/alertmanager.yml) for how to add one.
 
+For a full worked example — stopping `service-b`, watching the alert fire, and confirming
+recovery, with real timestamps and trace IDs — see
+[`docs/failure-simulation.md`](docs/failure-simulation.md). A timeline of other notable
+operational events (deployments, load test runs, alert transitions) is in
+[`docs/events.md`](docs/events.md).
+
 ---
 
 ## Container CI/CD Deployment

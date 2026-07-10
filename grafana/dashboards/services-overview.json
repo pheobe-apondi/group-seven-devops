@@ -2,7 +2,7 @@
   "title": "Group Seven — Service Overview",
   "uid": "group7-overview",
   "schemaVersion": 38,
-  "version": 2,
+  "version": 3,
   "refresh": "10s",
   "time": { "from": "now-15m", "to": "now" },
   "panels": [
@@ -151,6 +151,16 @@
       },
       "options": {
         "showHeader": true
+      }
+    },
+    {
+      "id": 7,
+      "title": "Distributed Tracing",
+      "type": "text",
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 4 },
+      "options": {
+        "mode": "markdown",
+        "content": "Jaeger shows per-hop detail Prometheus/Grafana don't: service name, endpoint, duration, status, and error state for every span. Open the [Jaeger UI](http://localhost:16686) and search by service name (`service-a`, `service-b`, `service-c`), or paste a `trace_id` copied from a log line directly into the search box. See [jaeger/README.md](https://github.com/pheobe-apondi/group-seven-devops/blob/main/jaeger/README.md) for how tracing is wired up."
       }
     }
   ]
