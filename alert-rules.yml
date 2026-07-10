@@ -1,0 +1,38 @@
+groups:
+  - name: group-seven-devops-alerts
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"service-a|service-b|service-c"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: >-
+            Prometheus has failed to scrape {{ $labels.job }} for at least 30s
+            (target {{ $labels.instance }}). The service is either crashed,
+            unreachable, or still starting up.
+
+      - alert: HighErrorRate
+        expr: rate(http_errors_total[2m]) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.service }}{{ $labels.route }}"
+          description: >-
+            {{ $labels.service }} route {{ $labels.route }} has been returning
+            more than 0.1 errors/sec (5xx) for at least 1 minute
+            (current value: {{ $value | printf "%.2f" }}/s).
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum by (service, route, le) (rate(http_request_duration_seconds_bucket[5m]))) > 0.5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 latency on {{ $labels.service }}{{ $labels.route }}"
+          description: >-
+            {{ $labels.service }} route {{ $labels.route }} p95 latency has
+            been above 500ms for at least 1 minute
+            (current p95: {{ $value | printf "%.3f" }}s).

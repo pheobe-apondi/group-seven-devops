@@ -794,6 +794,31 @@ docker compose start service-b
 
 ---
 
+## Alerting
+
+Three Prometheus alert rules ([`alert-rules.yml`](alert-rules.yml)) detect service-down,
+high-error-rate, and high-latency conditions, and route to Alertmanager. Full
+reproduction steps, expected timings, and how to confirm each one clears are in
+[`docs/alerting.md`](docs/alerting.md) — including real observed behavior like why a
+single failing request only reaches `pending`, not `firing`.
+
+```bash
+# Prometheus alert state
+open http://localhost:9090/alerts
+
+# Alertmanager — routed/active alerts
+open http://localhost:9093
+
+# Grafana dashboard also has an "Alert State" panel
+open http://localhost:3000
+```
+
+Alertmanager's default receiver has no external channel configured yet (no Slack/Discord
+webhook wired up) — alerts are fully visible and queryable, just not paged anywhere. See
+[`alertmanager/alertmanager.yml`](alertmanager/alertmanager.yml) for how to add one.
+
+---
+
 ## Container CI/CD Deployment
 
 ### Latest deployed version
