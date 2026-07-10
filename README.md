@@ -184,6 +184,10 @@ See [requirements.txt](requirements.txt) for pinned versions.
 
 ## System Architecture
 
+> This section covers the microservices/gateway architecture. For the full
+> observability plane (metrics/tracing/logging/alerting flow, plus known
+> limitations), see [`docs/architecture.md`](docs/architecture.md).
+
 ### High-Level Diagram
 
 ```
@@ -791,6 +795,41 @@ docker compose start service-b
 ```
 
 (`/slow` and `/fail` aren't routed through Nginx, since B and C stay internal by design — reach them via `docker compose exec` as above, or temporarily via `docker run --network group-seven-devops_backend curlimages/curl ...`.)
+
+---
+
+## Load Testing
+
+A repeatable [k6](https://k6.io/) load test lives in [`scripts/load-test.sh`](scripts/load-test.sh)
+and [`scripts/load-test.js`](scripts/load-test.js). It runs three scenarios — normal,
+stress, and failure traffic — against the gateway and prints full k6 output for each.
+
+```bash
+docker compose up -d
+./scripts/load-test.sh
+```
+
+No local k6 install is required — the script uses a local `k6` binary if it finds one,
+otherwise it runs the `grafana/k6` Docker image attached directly to the compose network
+(so it works even if a host port is already taken by something else).
+
+While it runs, watch the effect in real time:
+
+```bash
+# Prometheus — request rate / error rate / p95 climbing during stress and failure scenarios
+open http://localhost:9090/graph
+
+# Jaeger — a growing number of traces for service-a
+open http://localhost:16686
+
+# Grafana — the operating dashboard updating live
+open http://localhost:3000
+```
+
+Full results (real numbers from an actual run, not fabricated) are in
+[`docs/benchmark-report.md`](docs/benchmark-report.md), including what each scenario hits,
+what Prometheus/Jaeger showed during the run, and which alert conditions it did or didn't
+trigger.
 
 ---
 

@@ -33,10 +33,12 @@ the full k6 output to `docs/benchmark-results/{normal,stress,failure}.log`.
 
 Raw k6 output for each run is in [`docs/benchmark-results/`](benchmark-results/).
 
-Note: Prometheus alert *rules* (Goal 4) aren't wired up yet on this branch — the "Alert
-Condition" column above is based on manually evaluating the PRD's PromQL conditions
-against Prometheus immediately after each run (see below), not an actual firing
-Alertmanager notification.
+Note: this benchmark run predates [`alert-rules.yml`](../alert-rules.yml) (added in a
+later PR), so the "Alert Condition" column above reflects manually evaluating the PRD's
+PromQL conditions against Prometheus (see below), not an actual firing Alertmanager
+notification. Those same three conditions are now live Prometheus alert rules
+(`ServiceDown`, `HighErrorRate`, `HighLatency`) — see [`docs/alerting.md`](alerting.md)
+for each one triggered and cleared for real against a running stack.
 
 ## Metrics Observed
 
