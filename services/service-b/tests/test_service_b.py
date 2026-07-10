@@ -12,20 +12,41 @@ class TestServiceBHealth(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
 
-    def test_health_returns_200(self):
+    @patch('service_b.requests.get')
+    def test_health_returns_200(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=200)
         response = self.client.get('/health')
         self.assertEqual(response.status_code, 200)
 
-    def test_health_returns_json(self):
+    @patch('service_b.requests.get')
+    def test_health_returns_json(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=200)
         response = self.client.get('/health')
         data = json.loads(response.data)
-        self.assertEqual(data['status'], 'healthy')
+        self.assertEqual(data['status'], 'ok')
         self.assertEqual(data['service'], 'service-b')
 
-    def test_health_includes_port(self):
+    @patch('service_b.requests.get')
+    def test_health_includes_port(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=200)
         response = self.client.get('/health')
         data = json.loads(response.data)
         self.assertIn('port', data)
+
+    @patch('service_b.requests.get')
+    def test_health_ok_when_dependency_ok(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=200)
+        response = self.client.get('/health')
+        data = json.loads(response.data)
+        self.assertEqual(data['dependencies']['service-c'], 'ok')
+
+    @patch('service_b.requests.get')
+    def test_health_degraded_when_dependency_unreachable(self, mock_get):
+        mock_get.side_effect = Exception('Connection refused')
+        response = self.client.get('/health')
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'degraded')
+        self.assertEqual(data['dependencies']['service-c'], 'unreachable')
 
 
 class TestServiceBGreet(unittest.TestCase):

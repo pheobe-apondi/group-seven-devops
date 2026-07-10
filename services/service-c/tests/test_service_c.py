@@ -19,7 +19,7 @@ class TestServiceCHealth(unittest.TestCase):
     def test_health_returns_json(self):
         response = self.client.get('/health')
         data = json.loads(response.data)
-        self.assertEqual(data['status'], 'healthy')
+        self.assertEqual(data['status'], 'ok')
         self.assertEqual(data['service'], 'service-c')
 
     def test_health_includes_port(self):

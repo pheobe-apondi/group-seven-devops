@@ -727,6 +727,73 @@ See [docs/CONTAINER_VALIDATION.md](docs/CONTAINER_VALIDATION.md) for full valida
 
 ---
 
+## Observability: Metrics, Tracing, Health, and Failure Testing
+
+Each of service-a/b/c exposes the same instrumentation surface:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Own status + dependency status (`ok`, `degraded`, or `unreachable`) |
+| `GET /metrics` | Prometheus exposition: `http_requests_total`, `http_request_duration_seconds`, `http_errors_total`, `service_up` |
+| `GET /slow?delay=<seconds>` | Lab-only: sleeps before responding, to exercise p95 latency alerting |
+| `GET /fail` | Lab-only: always returns 500, to exercise error-rate alerting |
+
+### Accessing the operating view
+
+```bash
+docker compose up -d
+
+# Prometheus targets — confirm all three services show "up"
+open http://localhost:9090/targets
+
+# Grafana dashboard (admin/admin)
+open http://localhost:3000
+
+# Jaeger UI
+open http://localhost:16686
+```
+
+### Viewing a distributed trace
+
+Every incoming request creates a span, and the trace context propagates automatically to downstream calls (`RequestsInstrumentor` injects `traceparent` headers on every outgoing `requests` call).
+
+```bash
+# 1. Send a request that flows through all three services
+curl -H "X-Request-ID: demo-001" http://localhost:8080/service-a/greet-service-b
+
+# 2. Open Jaeger, search Service = service-a, and find the trace
+open http://localhost:16686
+
+# 3. Confirm the trace contains spans from service-a, service-b, and service-c,
+#    including the service-c -> service-a callback (/greeting-rcvd)
+```
+
+Each structured log line also includes the current `trace_id`, so you can pivot from a Jaeger trace straight to `docker compose logs`:
+
+```bash
+docker compose logs service-a | grep <trace_id>
+```
+
+### Triggering controlled failures
+
+```bash
+# High latency (service-b) — watch p95 climb in Grafana/Prometheus
+docker compose exec service-b python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:3002/slow?delay=3')"
+
+# Forced error (service-c) — watch http_errors_total / error-rate climb
+docker compose exec service-c python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:3003/fail')"
+
+# Service down — stop a container and watch its Prometheus target go "down"
+# and dependent services report "degraded" on /health
+docker compose stop service-b
+curl http://localhost:8080/service-a/health   # -> service-a reports service-b "unreachable"
+docker compose start service-b
+```
+
+(`/slow` and `/fail` aren't routed through Nginx, since B and C stay internal by design — reach them via `docker compose exec` as above, or temporarily via `docker run --network group-seven-devops_backend curlimages/curl ...`.)
+
+---
+
 ## Container CI/CD Deployment
 
 ### Latest deployed version
