@@ -6,10 +6,17 @@ services:
     volumes:
       - ./nginx/docker.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - service-a
+      service-a:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
   service-a:
     build:
@@ -20,12 +27,20 @@ services:
       SERVICE_B_URL: http://service-b:3002
       SERVICE_C_URL: http://service-c:3003
     depends_on:
-      - service-b
-      - service-c
+      service-b:
+        condition: service_healthy
+      service-c:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - frontend
       - backend
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3001/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
   service-b:
     build:
@@ -37,6 +52,12 @@ services:
     restart: unless-stopped
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3002/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
   service-c:
     build:
@@ -47,6 +68,12 @@ services:
     restart: unless-stopped
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3003/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
 networks:
   frontend:

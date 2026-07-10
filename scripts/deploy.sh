@@ -8,15 +8,20 @@ if [ -z "$IMAGE_TAG" ]; then
   exit 1
 fi
 
-export IMAGE_TAG
-export APP_NAME="${APP_NAME:-$(basename "$PWD")}" 
-
-if [ -z "${DOCKERHUB_USERNAME:-}" ]; then
-  echo "Missing DOCKERHUB_USERNAME"
+if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{7,40}$ ]]; then
+  echo "Error: IMAGE_TAG must be in the format sha-<commit-hash> (e.g. sha-a1b2c3d)"
   exit 1
 fi
 
-echo "Deploying ${APP_NAME} using image tag: ${IMAGE_TAG}"
+if [ -z "${DOCKERHUB_USERNAME:-}" ]; then
+  echo "Error: DOCKERHUB_USERNAME is not set"
+  exit 1
+fi
+
+export IMAGE_TAG
+export APP_NAME="${APP_NAME:-group-seven-devops}"
+
+echo "Deploying ${APP_NAME} with image tag: ${IMAGE_TAG}"
 docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d --remove-orphans
+docker compose -f docker-compose.prod.yml up -d --wait --remove-orphans
 docker compose -f docker-compose.prod.yml ps
