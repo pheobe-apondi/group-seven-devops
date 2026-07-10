@@ -93,6 +93,7 @@ services:
     image: prom/prometheus:v2.53.0
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -100,9 +101,25 @@ services:
       - "--storage.tsdb.retention.time=7d"
     ports:
       - "9090:9090"
+    depends_on:
+      - alertmanager
     restart: unless-stopped
     networks:
       - backend
+      - observability
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    networks:
       - observability
 
   grafana:
@@ -131,3 +148,4 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
+  alertmanager-data:

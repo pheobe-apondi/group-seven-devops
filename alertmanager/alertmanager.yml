@@ -1,0 +1,22 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "default-receiver"
+  group_by: ["alertname", "service"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+
+receivers:
+  - name: "default-receiver"
+    # Lab setup: no external notification channel is wired up yet, so
+    # alerts are visible in the Alertmanager UI/API but nothing is
+    # actually paged. To forward to Slack/Discord/email/a generic
+    # webhook, add the corresponding *_configs block here, e.g.:
+    #
+    # slack_configs:
+    #   - api_url: "https://hooks.slack.com/services/T000/B000/XXXX"
+    #     channel: "#alerts"
+    #
+    # then `docker compose restart alertmanager`.
