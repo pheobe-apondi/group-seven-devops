@@ -1,0 +1,45 @@
+{
+  "family": "devops-g7-service-a-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/devops-g7-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/devops-g7-service-a-task-role",
+  "containerDefinitions": [
+    {
+      "name": "service-a",
+      "image": "<ACCOUNT_ID>.dkr.ecr.eu-west-2.amazonaws.com/devops-g7-service-a:<COMMIT_SHA>",
+      "essential": true,
+      "portMappings": [
+        {
+          "name": "service-a",
+          "containerPort": 3001,
+          "protocol": "tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "environment": [
+        { "name": "BIND_HOST", "value": "0.0.0.0" }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3001/health')\" || exit 1"
+        ],
+        "interval": 10,
+        "timeout": 3,
+        "retries": 3,
+        "startPeriod": 5
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/devops-g7-service-a",
+          "awslogs-region": "eu-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
