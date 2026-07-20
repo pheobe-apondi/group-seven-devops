@@ -2,33 +2,30 @@
 
 **Group:** 7 &nbsp;|&nbsp; **Region:** eu-west-2 (London, assigned per-group) &nbsp;|&nbsp; **Naming prefix:** `devops-g7-`
 
-Submitted for Gate 1. No AWS resources should exist before this is reviewed.
 
 ---
 
-## 0. What changes vs. the current docker-compose architecture
+## 0. Architecture changes: docker-compose → AWS
 
-This matters for the graph below, so it's worth stating up front:
+The following technical differences from the current `docker-compose` setup inform the dependency
+graph and traffic contracts below.
 
-- **Nginx is removed. The ALB replaces it entirely** — there is no reverse proxy re-writing paths.
-  Today, Nginx strips the `/service-a/` prefix before proxying to service-a
-  (`nginx/docker.conf:31-39`), so `service_a.py` only ever sees root paths (`/health`,
-  `/greet-service-b`, `/metrics`). The ALB does **not** do path rewriting by default, so on AWS the
-  public URL becomes `http://<alb-dns>/greet-service-b`, not `http://<alb-dns>/service-a/greet-service-b`.
-  The ALB target group health check should point at `/health` (root), matching the app's actual route.
-- **Service-to-service hostnames stay literally the same.** `service_a.py` calls
-  `http://service-b:3002/greet` as a hardcoded string (not via the `SERVICE_B_URL` env var docker-compose
-  sets — see `services/service-a/service_a.py:129`). As long as the ECS Service Connect service name for
-  service-b is exactly `service-b` (and service-c is `service-c`), this works with **zero code changes**.
-  This is also why the assignment's required Service Connect names (`service-a`, `service-b`,
-  `service-c`) matter — get the alias wrong and the app breaks without any AWS-side error.
-- **Observability stack (Prometheus/Grafana/Jaeger/Alertmanager) is out of scope for this lab.** Those
-  only exist in dev `docker-compose.yml`, not `docker-compose.prod.yml`, and Phase 1–5 of this assignment
-  don't mention them. CloudWatch Logs is the only required logging destination.
-- **BIND_HOST=0.0.0.0 is already set** in docker-compose and used by all three services
-  (`bind_host = "0.0.0.0"` unless `--loopback` is passed — see `service_a.py:231`), so no code change is
-  needed for the "does the application listen on 0.0.0.0" question in section 2.2 of the assignment —
-  the answer is yes, provided the container is run without `--loopback` (it isn't, in the Dockerfile CMD).
+- **Nginx is replaced by the ALB.** Nginx currently strips the `/service-a/` prefix before proxying
+  to service-a (`nginx/docker.conf:31-39`), so `service_a.py` only receives root paths (`/health`,
+  `/greet-service-b`, `/metrics`). The ALB does not perform path rewriting, so the public URL on AWS
+  is `http://<alb-dns>/greet-service-b`, not `http://<alb-dns>/service-a/greet-service-b`. The ALB
+  target group health check points at `/health`.
+- **Service-to-service hostnames are unchanged.** `service_a.py` calls `http://service-b:3002/greet`
+  directly rather than via the `SERVICE_B_URL` environment variable set in `docker-compose.yml` (see
+  `services/service-a/service_a.py:129`). The ECS Service Connect discovery name for service-b must
+  therefore be exactly `service-b` (and service-c exactly `service-c`) for the existing code to work
+  without modification.
+- **The observability stack is out of scope.** Prometheus, Grafana, Jaeger, and Alertmanager exist
+  only in the dev `docker-compose.yml`, not `docker-compose.prod.yml`, and are not part of this
+  assignment's requirements. CloudWatch Logs is the only required logging destination.
+- **`BIND_HOST=0.0.0.0` is already the container default** (`service_a.py:231` binds to `0.0.0.0`
+  unless `--loopback` is passed, which the Dockerfile CMD does not do), satisfying the assignment's
+  "does the application listen on 0.0.0.0" requirement (section 2.2) with no code change.
 
 ---
 
@@ -90,7 +87,7 @@ Attached at every layer from ECS cluster downward:
 | Question | Team answer |
 |---|---|
 | What must exist before a Fargate task can start? | Cluster, task definition (valid execution role + image URI), subnets, security group. Execution role must have `AmazonECSTaskExecutionRolePolicy` (or equivalent scoped policy) so ECS can call `ecr:GetAuthorizationToken`/`GetDownloadUrlForLayer`/`BatchGetImage` and `logs:CreateLogStream`/`PutLogEvents`. |
-| What must exist before ECS can pull an image? | ECR repository with at least one pushed, immutable-tagged image; execution role with ECR pull permissions; outbound network path from the subnet (default subnet + public IP, since we're not using a NAT gateway or VPC endpoint in this lab). |
+| What must exist before ECS can pull an image? | ECR repository with at least one pushed, immutable-tagged image; execution role with ECR pull permissions; outbound network path from the subnet (default subnet + public IP, since this lab does not use a NAT gateway or VPC endpoint). |
 | What must exist before the ALB can route traffic? | ALB, listener (:80), target group (type `ip`, correct port), at least one registered target that passes its health check, and a security-group path from the ALB SG to the target's SG on the app port. |
 | What depends on the named container port? | Service Connect port-mapping name must match what's referenced in the Service Connect configuration; the target group's port must match the container's actual listening port (3001 for service-a). Get the name wrong and Service Connect silently fails to route; get the port wrong and ECS deploys a task the ALB will mark unhealthy. |
 | Which resources survive task replacement? | ECR images, task-definition revisions, ECS service, cluster, ALB, target group, security groups, CloudWatch log group, Service Connect namespace/config. Only the task ENI/IP and the specific task ID are ephemeral. |
@@ -151,12 +148,6 @@ Note the last row: the assignment's traffic-contract template doesn't include it
 | Service B owner | Image, ECR, task definition, security group, ECS service, pipeline | Mercylin |
 | Service C owner | Image, ECR, task definition, security group, ECS service, pipeline | Mercylin |
 | Platform owner | Cluster, namespace, ALB, target group, CodeConnections | Pheobe |
-
-> Team of two, split evenly: Pheobe owns Service A + Platform, Mercylin owns Service B + Service C —
-> two roles each. That's a fair division for a 2-person team, not the "one person does everything"
-> case the assignment's 70% scoring cap is aimed at. Still worth prepping for Demo 1, where each
-> owner gets a question about a *teammate's* service — Pheobe should be able to speak to B/C, and
-> Mercylin to A/Platform, since it's just the two of you.
 
 ---
 

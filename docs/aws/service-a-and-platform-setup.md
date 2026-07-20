@@ -1,8 +1,6 @@
 # Service A + Platform Setup — CLI Reference
 
-Owner: Pheobe (Service A owner + Platform owner). This covers only Pheobe's scope — Service A's
-resources and the shared platform resources (cluster, namespace, ALB, target group,
-CodeConnections). Mercylin owns Service B and Service C separately.
+Owner: Pheobe — Service A and Platform (cluster, namespace, ALB, target group, CodeConnections).
 
 Run these in order. Each command tags resources with the four required tags
 (`Project=devops-mentorship`, `Group=group-7`, `Environment=lab`, `Owner=<role>`) where the AWS
@@ -16,15 +14,15 @@ Set these once per shell session before running anything below.
 
 **Before running anything below:** each team member configures their own named CLI profile with
 their own IAM access keys, rather than the shell's `default` profile — this avoids clobbering a
-personal/work AWS profile that may already exist on your machine. Anyone on the team, regardless of
+personal/work AWS profile that may already exist on that machine. Anyone on the team, regardless of
 which service they own, does this once:
 
 ```bash
 aws configure --profile devops-g7
-# Enter your own IAM access key ID + secret access key (from IAM console, not a teammate's),
-# region eu-west-2, output format json.
+# Enter that IAM user's own access key ID + secret access key (from the IAM console,
+# not a teammate's), region eu-west-2, output format json.
 
-# Verify it resolves to the lab account (827478161993) under your own IAM user, not a work account:
+# Verify it resolves to the lab account (827478161993) under the expected IAM user, not a work account:
 aws sts get-caller-identity --profile devops-g7
 ```
 
