@@ -1,0 +1,52 @@
+version: 0.2
+
+# CodeBuild project settings this buildspec depends on (set on the project, not here):
+#   - Privileged mode: ENABLED (required for `docker build` inside CodeBuild)
+#   - Environment variable AWS_ACCOUNT_ID (account ID, e.g. 123456789012)
+#   - Environment variable AWS_DEFAULT_REGION = eu-west-2
+#   - Service role with: ecr:GetAuthorizationToken, ecr:BatchCheckLayerAvailability,
+#     ecr:GetDownloadUrlForLayer, ecr:BatchGetImage, ecr:PutImage, ecr:InitiateLayerUpload,
+#     ecr:UploadLayerPart, ecr:CompleteLayerUpload, logs:CreateLogGroup, logs:CreateLogStream,
+#     logs:PutLogEvents
+
+env:
+  variables:
+    IMAGE_REPO_NAME: devops-g7-service-c
+    CONTAINER_NAME: service-c
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - echo "Installing test dependencies"
+      - pip install -r requirements.txt -r requirements-dev.txt
+
+  pre_build:
+    commands:
+      - echo "Running unit tests for service-c"
+      - python -m pytest -v services/service-c/tests/
+      - echo "Compiling service-c for syntax errors"
+      - python -m compileall services/service-c/
+      - echo "Logging in to Amazon ECR"
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - COMMIT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$COMMIT_SHA
+      - echo "Building image with tag $COMMIT_SHA"
+
+  build:
+    commands:
+      - echo "Building service-c Docker image (repo root context, per services/service-c/Dockerfile)"
+      - docker build -t $IMAGE_URI -f services/service-c/Dockerfile .
+
+  post_build:
+    commands:
+      - echo "Pushing image to ECR"
+      - docker push $IMAGE_URI
+      - echo "Writing imagedefinitions.json for the ECS deploy action"
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$CONTAINER_NAME" "$IMAGE_URI" > imagedefinitions.json
+      - cat imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
