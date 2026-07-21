@@ -1,0 +1,45 @@
+{
+  "family": "devops-g7-service-b-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/devops-g7-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/devops-g7-service-b-task-role",
+  "containerDefinitions": [
+    {
+      "name": "service-b",
+      "image": "<ACCOUNT_ID>.dkr.ecr.eu-west-2.amazonaws.com/devops-g7-service-b:<COMMIT_SHA>",
+      "essential": true,
+      "portMappings": [
+        {
+          "name": "service-b",
+          "containerPort": 3002,
+          "protocol": "tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "environment": [
+        { "name": "BIND_HOST", "value": "0.0.0.0" }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3002/health')\" || exit 1"
+        ],
+        "interval": 10,
+        "timeout": 3,
+        "retries": 3,
+        "startPeriod": 5
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/devops-g7-service-b",
+          "awslogs-region": "eu-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
