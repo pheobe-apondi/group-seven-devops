@@ -7,6 +7,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
+import boto3
+from botocore.exceptions import ClientError
 import json
 import os
 import uuid
@@ -14,7 +16,6 @@ import time
 from datetime import datetime
 import requests
 import sys
-import threading
 
 app = Flask(__name__)
 
@@ -80,8 +81,31 @@ def log_event(event, level="info", **kwargs):
     sys.stdout.flush()
 
 
-# Holds per-request callback events so /greet-service-b can wait for C's callback
-_pending_callbacks = {}
+# Callback coordination lives in DynamoDB, not in-process memory: service-a runs with desired
+# count 2, and the /greeting-rcvd callback from service-c is load-balanced by Service Connect
+# across both replicas, so a per-process dict + threading.Event cannot be relied on to see it.
+CALLBACKS_TABLE_NAME = os.environ.get("CALLBACKS_TABLE_NAME", "devops-g7-service-a-callbacks")
+_dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "eu-west-2"))
+callbacks_table = _dynamodb.Table(CALLBACKS_TABLE_NAME)
+
+
+def wait_for_callback(request_id, timeout=5, poll_interval=0.2):
+    """Poll the shared callbacks table until service-c's record appears or timeout elapses."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            resp = callbacks_table.get_item(Key={"request_id": request_id})
+        except ClientError as e:
+            log_event("callback_poll_error", level="error", request_id=request_id, error=str(e))
+            return False
+        if "Item" in resp:
+            try:
+                callbacks_table.delete_item(Key={"request_id": request_id})
+            except ClientError:
+                pass  # best-effort cleanup; TTL clears it either way
+            return True
+        time.sleep(poll_interval)
+    return False
 
 
 @app.route("/health", methods=["GET"])
@@ -132,9 +156,6 @@ def greet_service_b():
 
     log_event("request_received", request_id=request_id, method="GET", path=route)
 
-    event = threading.Event()
-    _pending_callbacks[request_id] = event
-
     try:
         response = requests.get(
             build_service_url("http://service-b:3002", "/greet"),
@@ -144,8 +165,7 @@ def greet_service_b():
         log_event("downstream_call_success", request_id=request_id,
                   target="service-b", status=response.status_code)
 
-        callback_received = event.wait(timeout=5)
-        _pending_callbacks.pop(request_id, None)
+        callback_received = wait_for_callback(request_id, timeout=5)
 
         duration = time.time() - start
         REQUEST_DURATION.labels(service=SERVICE_NAME, method="GET", route=route).observe(duration)
@@ -168,7 +188,6 @@ def greet_service_b():
             return jsonify({"error": "Callback from service-c timed out"}), 504
 
     except Exception as e:
-        _pending_callbacks.pop(request_id, None)
         duration = time.time() - start
         REQUEST_COUNT.labels(service=SERVICE_NAME, method="GET", route=route, status_code="500").inc()
         ERROR_COUNT.labels(service=SERVICE_NAME, route=route).inc()
@@ -185,9 +204,14 @@ def greeting_rcvd():
     REQUEST_COUNT.labels(service=SERVICE_NAME, method="POST", route="/greeting-rcvd", status_code="200").inc()
     log_event("callback_received", request_id=request_id,
               source_service=data.get("source_service"), status=200)
-    event = _pending_callbacks.get(request_id)
-    if event:
-        event.set()
+    try:
+        callbacks_table.put_item(Item={
+            "request_id": request_id,
+            "source_service": data.get("source_service", "unknown"),
+            "expires_at": int(time.time()) + 60
+        })
+    except ClientError as e:
+        log_event("callback_store_error", level="error", request_id=request_id, error=str(e))
     return jsonify({"status": "received"}), 200
 
 
