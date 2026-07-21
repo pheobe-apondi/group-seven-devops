@@ -20,7 +20,9 @@
         }
       ],
       "environment": [
-        { "name": "BIND_HOST", "value": "0.0.0.0" }
+        { "name": "BIND_HOST", "value": "0.0.0.0" },
+        { "name": "AWS_REGION", "value": "eu-west-2" },
+        { "name": "CALLBACKS_TABLE_NAME", "value": "devops-g7-service-a-callbacks" }
       ],
       "healthCheck": {
         "command": [
