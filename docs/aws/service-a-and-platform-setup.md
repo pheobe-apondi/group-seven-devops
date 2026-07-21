@@ -334,9 +334,15 @@ full A→B→C→callback flow with no code changes on either side.
 Fargate networking, ALB routing, and Service Connect's Envoy sidecar (see `server: envoy` response
 header) are all working correctly in isolation.
 
-**Still outstanding for Service A's part specifically:**
-- The `service-c → service-a` SG rule for the `/greeting-rcvd` callback (needs Mercylin's
-  `service-c-sg` ID)
-- CodePipeline + CodeBuild project for Service A (source → build → ECR push → ECS deploy), so
-  merges to `main` deploy automatically instead of the manual build/push/register done above
-- Gate 2 negative tests (`Internet → service-a:3001` denied, `A → C` denied) once C exists
+**Resolved since initial deployment:**
+- `service-c → service-a` SG rule for the `/greeting-rcvd` callback — confirmed present
+  (`devops-g7-service-a-sg` allows port 3001 from both the ALB and `devops-g7-service-c-sg`)
+- CodePipeline + CodeBuild for Service A — live, verified end-to-end (merge → webhook →
+  build → ECR push → ECS deploy → new task-definition revision → rolling deployment)
+
+**Known issue — see `docs/aws/scar-log.md` (Scar 1):** `/greet-service-b` intermittently returns
+`504` under service-a's required desired count of 2. Root cause is an in-process callback-state bug
+in `service_a.py`, not an AWS misconfiguration — full evidence and analysis in the scar log.
+
+**Still outstanding:**
+- Gate 2 negative tests (`Internet → service-a:3001` denied, `A → C` denied)
