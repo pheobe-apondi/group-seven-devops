@@ -37,7 +37,7 @@ phases:
   build:
     commands:
       - echo "Building service-b Docker image (repo root context, per services/service-b/Dockerfile)"
-      - docker build -t $IMAGE_URI -f services/service-b/Dockerfile .
+      - docker build --build-arg GIT_SHA=$COMMIT_SHA -t $IMAGE_URI -f services/service-b/Dockerfile .
 
   post_build:
     commands:

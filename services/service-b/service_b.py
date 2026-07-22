@@ -19,6 +19,7 @@ app = Flask(__name__)
 
 SERVICE_NAME = "service-b"
 PORT = 3002
+VERSION = os.environ.get("GIT_SHA", "unknown")
 
 # --- Prometheus metrics ---
 REQUEST_COUNT = Counter(
@@ -99,7 +100,17 @@ def health():
         "service": SERVICE_NAME,
         "status": overall,
         "port": PORT,
+        "version": VERSION,
         "dependencies": dependencies
+    }), 200
+
+
+@app.route("/version", methods=["GET"])
+def version():
+    return jsonify({
+        "service": SERVICE_NAME,
+        "version": VERSION,
+        "status": "ok"
     }), 200
 
 
@@ -190,6 +201,6 @@ def not_found(e):
 
 
 if __name__ == "__main__":
-    log_event("service_starting", port=PORT)
+    log_event("service_starting", port=PORT, version=VERSION)
     bind_host = "127.0.0.1" if "--loopback" in sys.argv else "0.0.0.0"
     app.run(host=bind_host, port=PORT, debug=False)
