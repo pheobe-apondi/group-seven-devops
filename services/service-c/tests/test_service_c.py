@@ -27,6 +27,27 @@ class TestServiceCHealth(unittest.TestCase):
         data = json.loads(response.data)
         self.assertIn('port', data)
 
+    def test_health_includes_version(self):
+        response = self.client.get('/health')
+        data = json.loads(response.data)
+        self.assertIn('version', data)
+
+
+class TestServiceCVersion(unittest.TestCase):
+    def setUp(self):
+        self.client = app.test_client()
+
+    def test_version_returns_200(self):
+        response = self.client.get('/version')
+        self.assertEqual(response.status_code, 200)
+
+    def test_version_returns_json(self):
+        response = self.client.get('/version')
+        data = json.loads(response.data)
+        self.assertEqual(data['service'], 'service-c')
+        self.assertEqual(data['status'], 'ok')
+        self.assertIn('version', data)
+
 
 class TestServiceCGreet(unittest.TestCase):
     def setUp(self):
