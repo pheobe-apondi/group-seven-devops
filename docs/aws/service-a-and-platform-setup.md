@@ -320,8 +320,9 @@ full A→B→C→callback flow with no code changes on either side.
 | Target group ARN | `arn:aws:elasticloadbalancing:eu-west-2:827478161993:targetgroup/devops-g7-service-a-tg/d12ce60e33b072b3` |
 | ECS cluster | `devops-g7-cluster` |
 | ECS service | `devops-g7-service-a-svc` (desired 2, running 2, both targets healthy) |
-| Task definition | `devops-g7-service-a-task:1` |
-| ECR image | `827478161993.dkr.ecr.eu-west-2.amazonaws.com/devops-g7-service-a:4fa0583` |
+| Task definition | `devops-g7-service-a-task:8` (env: `BIND_HOST`, `AWS_REGION`, `CALLBACKS_TABLE_NAME`) |
+| ECR image | `827478161993.dkr.ecr.eu-west-2.amazonaws.com/devops-g7-service-a:045af3b` |
+| DynamoDB callback table | `devops-g7-service-a-callbacks` (TTL on `expires_at`) |
 | Service Connect namespace | `g7.internal` (`ns-uijmzcpru6oqmjvg`) |
 | Execution role | `arn:aws:iam::827478161993:role/devops-g7-ecs-execution-role` |
 | Task role | `arn:aws:iam::827478161993:role/devops-g7-service-a-task-role` |
@@ -340,9 +341,11 @@ header) are all working correctly in isolation.
 - CodePipeline + CodeBuild for Service A — live, verified end-to-end (merge → webhook →
   build → ECR push → ECS deploy → new task-definition revision → rolling deployment)
 
-**Known issue — see `docs/aws/scar-log.md` (Scar 1):** `/greet-service-b` intermittently returns
-`504` under service-a's required desired count of 2. Root cause is an in-process callback-state bug
-in `service_a.py`, not an AWS misconfiguration — full evidence and analysis in the scar log.
+**Fixed — see `docs/aws/scar-log.md` (Scar 1 and Scar 2):**
+- The intermittent `504` under desired count 2 (in-process callback state → DynamoDB), and
+- Task-definition environment drift (the deploy pipeline clones the currently-running task
+  definition and patches only the image — it never re-reads `ecs/service-a-task-definition.json` —
+  so a file edit alone doesn't reach production without a manual re-registration, as happened here).
 
 **Still outstanding:**
 - Gate 2 negative tests (`Internet → service-a:3001` denied, `A → C` denied)
